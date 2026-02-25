@@ -78,15 +78,22 @@ When the user adds a new column, filter, or business rule, suggest adding a vali
      description="<what the rule checks>",
      condition_sql="<the validation SQL>"
    ) → returns YAML
+   ⚠ If this fails (e.g. column doesn't exist yet in the live table), fall back to:
+   createCustomSqlMonitorMac(
+     mcon="<table_mcon>",
+     description="<what the rule checks>",
+     sql="<your validation SQL that returns violating rows>"
+   )
 3. Save the YAML to <project>/monitors/<table_name>.yml
 4. Run: montecarlo monitors apply --dry-run (to preview)
 5. Run: montecarlo monitors apply --auto-yes (to apply)
 ```
 
 **Important — YAML format for `monitors apply`:**
-The `createValidationMonitorMac` tool generates `validation:` format YAML. The `montecarlo monitors apply` CLI expects a different format with `montecarlo:` as the root key. Reformat the generated YAML as:
+Both `createValidationMonitorMac` and `createCustomSqlMonitorMac` return YAML that is not directly compatible with `montecarlo monitors apply`. Reformat the output into a standalone monitor file with `montecarlo:` as the root key:
 
 ```yaml
+# monitors/<table_name>.yml  ← monitor definitions only, NOT montecarlo.yml
 montecarlo:
   custom_sql:
     - warehouse: <warehouse_name>
@@ -101,12 +108,15 @@ montecarlo:
           threshold_value: 0.0
 ```
 
-The `montecarlo.yml` project config (separate from monitor files) should be:
+The `montecarlo.yml` project config is a **separate file** in the project root containing only:
 ```yaml
+# montecarlo.yml  ← project config only, NOT monitor definitions
 version: 1
 namespace: <your-namespace>
 default_resource: <warehouse_name>
 ```
+
+Do NOT put `version:`, `namespace:`, or `default_resource:` inside monitor definition files.
 
 ### 3. Alert triage — when investigating an active incident
 
@@ -246,8 +256,11 @@ curl -s -o /dev/null -w "%{http_code}" https://integrations.getmontecarlo.com/mc
 ```
 Check that `x-mcd-id` and `x-mcd-token` are set correctly in your MCP config. The key format is `<KEY_ID>:<KEY_SECRET>` — these are split across two separate headers.
 
-**`montecarlo monitors apply` fails with "Not a Monte Carlo project":**
-Ensure `montecarlo.yml` (the project config) exists in your working directory.
-
 **`montecarlo monitors apply` fails with "Unknown field":**
-The monitor definition files must have `montecarlo:` as the root key. The `validation:` format from `createValidationMonitorMac` is not directly compatible — use the `custom_sql:` format shown above.
+Monitor definition files must have `montecarlo:` as the root key — do not copy the `validation:` or `custom_sql:` output from the MCP tools directly. Reformat using the `montecarlo: > custom_sql:` structure shown in Workflow 2.
+
+**`montecarlo monitors apply` fails with "Not a Monte Carlo project":**
+Ensure `montecarlo.yml` (the project config) exists in the working directory. This file must contain only `version`, `namespace`, and `default_resource` — not monitor definitions.
+
+**`createValidationMonitorMac` fails with a Snowflake error:**
+This tool validates the condition SQL against the live table. If the column doesn't exist yet (e.g. you're writing the monitor before deploying the model change), fall back to `createCustomSqlMonitorMac` with an explicit SQL query instead.
