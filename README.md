@@ -1,21 +1,39 @@
-# Monte Carlo AI Editor Plugin
+# Monte Carlo AI Editor Skill
 
-Bring Monte Carlo data observability context directly into Claude Code. When you modify a dbt model or SQL pipeline, get table health, lineage, active alerts, and change impact assessments — and deploy validation monitors — without leaving your editor.
+Bring Monte Carlo data observability into your editor — automatically, before you write a single line of code.
 
 ## What this does
 
-When you open a dbt model, Claude automatically surfaces table health, upstream/downstream lineage, active alerts, and a change impact assessment — and uses that context to shape the code it writes. If you try to rename a column with 500 downstream dependents, Claude won't just warn you — it will recommend a safe transition strategy and explain why, citing the specific MC data it found. When you add new logic, it generates and deploys monitors-as-code. It works with Claude Code, Cursor, and any AI editor with MCP support.
+When you reference a dbt model or table, Monte Carlo context comes to you: table health, active alerts, lineage, and downstream blast radius. Your AI editor uses that context to shape the code it writes — not just surface it. If you try to rename a column with 500 downstream dependents, the editor recommends a safe transition strategy and explains why, citing the specific MC data it found. When you add new logic, it generates and deploys the right monitor for your logic — validation, metric, comparison, or custom SQL — before you merge.
+
+## Editor & Stack Compatibility
+
+The skill works with any AI editor that supports MCP and the Agent Skills format — including Claude Code, Cursor, and VS Code.
+
+For data stacks, compatibility varies by how you work:
+
+| Stack | Support | Notes |
+|---|---|---|
+| dbt + any MC-supported warehouse | ✅ Full | Optimized and tested |
+| SQL-first, no dbt | 🟡 Partial | Core workflows work via explicit prompting; auto-triggers on file open coming soon |
+| Databricks notebooks | 🟡 Partial | Health check, impact assessment, and alert triage work; file-based triggers coming soon |
+| SQLMesh | 🟡 Partial | Core workflows work; native SQLMesh project structure support coming soon |
+| PySpark / non-SQL pipelines | 🟠 Limited | Manual prompting only; broader support on the roadmap |
+
+**Coming shortly:** Generic SQL file triggers, Databricks notebook support, and SQLMesh project structure support — so auto-activation works regardless of your transformation tool.
+
+Core workflows — table health check, change impact assessment, alert triage, and monitor generation — work for any warehouse supported by Monte Carlo.
+
 
 ## Prerequisites
 
-- Claude Code, Cursor, or VS Code with MCP support
-- Node.js (LTS) + npm installed
+- Claude Code, Cursor, VS Code or any editors with MCP support
 - Monte Carlo account with Editor role or above
-- MC CLI installed for monitor deployment (`pip install montecarlodata`)
+- [MC CLI](https://docs.getmontecarlo.com/docs/using-the-cli) installed for monitor deployment (`pip install montecarlodata`)
 
 ## Setup
 
-### Step 1 — Create an MCP server key
+### Step 1 — Obtain an MCP server key
 
 1. Go to **Monte Carlo → Settings → API Keys**
 2. Click **Add** and select type **MCP Server**
@@ -25,7 +43,7 @@ MCP keys are separate from standard API keys. Standard keys work for the CLI; MC
 
 ### Step 2 — Install the skill
 
-Copy the skill file to Claude Code's skills directory:
+Copy the skill file to your editor's skills directory. For Claude Code:
 
 ```bash
 mkdir -p ~/.claude/skills/monte-carlo

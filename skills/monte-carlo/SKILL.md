@@ -1,15 +1,16 @@
 ---
 name: monte-carlo
 description: |
-  Automatically activates when working with dbt models, SQL pipelines, or data
-  tables to surface Monte Carlo observability context — table health, active alerts,
-  lineage, and blast radius — before any code is written or changed. Also generates
-  and deploys data quality monitors for new transformation logic. Do not wait to be
-  asked: run the appropriate workflow as soon as a relevant file or table is referenced.
+    Automatically activates when a dbt model, SQL file, or table is referenced.
+    Surfaces Monte Carlo context — table health, active alerts, lineage, blast
+    radius — before any code is written, and uses those findings to shape code
+    recommendations. Generates and optionally deploys monitors for new transformation
+    logic. Do not wait to be asked: run the appropriate workflow as soon as a relevant
+    file or table is referenced.
 version: 1.0.0
 ---
 
-# Monte Carlo Data — AI Editor Skill
+# Monte Carlo — AI Editor Skill
 
 This skill brings Monte Carlo's data observability context directly into your editor. When you're modifying a dbt model or SQL pipeline, use it to surface table health, lineage, active alerts, and to generate monitors-as-code without leaving Claude Code.
 
@@ -200,7 +201,7 @@ Then run the appropriate sequence:
 ```
 
 **Important — YAML format for `monitors apply`:**
-Both `createValidationMonitorMac` and `createCustomSqlMonitorMac` return YAML that is not directly compatible with `montecarlo monitors apply`. Reformat the output into a standalone monitor file with `montecarlo:` as the root key:
+All `create*MonitorMac` tools return YAML that is not directly compatible with `montecarlo monitors apply`. Reformat the output into a standalone monitor file with `montecarlo:` as the root key. The second-level key matches the monitor type: `custom_sql:`, `validation:`, `metric:`, or `comparison:`. The example below shows `custom_sql:` — substitute the appropriate key for other monitor types.
 
 ```yaml
 # monitors/<table_name>.yml  ← monitor definitions only, NOT montecarlo.yml
