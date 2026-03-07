@@ -1,0 +1,14 @@
+.env
+*.key
+.mcp.json
+node_modules/
+.DS_Store
+.venv/
+target/
+
+# Demo runtime artifacts (keep locally, don't commit)
+demo/.claude/
+demo/models/
+demo/monitors/
+demo/montecarlo.yml
+demo/target/
