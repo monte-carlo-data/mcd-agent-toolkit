@@ -86,7 +86,7 @@ Claude will call `testConnection` and confirm your credentials are working.
 
 ## How to use it
 
-You don't need to ask for it — the skill activates automatically.
+Open your dbt project (or any data engineering codebase) in your editor. From there, you can either reference a few models or tables you plan to work on — or just prompt the editor with the change you want to make. The skill activates automatically based on what you're doing; no special commands needed.
 
 **Workflow 1 — Table health check:** Opens when you reference a `.sql` file, dbt model, or table name. Surfaces freshness, row count, importance, lineage, and active alerts. Auto-escalates to a full impact assessment if the table has active alerts, key asset dependents, or high importance.
 
