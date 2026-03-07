@@ -1,37 +1,116 @@
-# Monte Carlo AI Editor Plugin — Hackathon Project
+# Monte Carlo AI Editor Plugin — Stage 1: Packaging
 
-## Project Overview
+## Objective
+Prepare the plugin for internal launch at Monte Carlo. Three deliverables:
+1. `README.md` — manual setup instructions for a technical MC data engineer
+2. Repo polish — clean structure, no dev artifacts, ready for internal eyes
+3. Launch artifacts — Slack message + internal setup guide
 
-This is a hackathon project to build a Claude Code plugin for Monte Carlo Data (MC), inspired by the Braintrust Claude Code integration. The goal is to bring MC's data observability context directly into AI code editors, so data engineers can get lineage, alerts, and monitor suggestions without leaving their editor.
+Do not modify `skills/monte-carlo/SKILL.md` in this session.
 
-This is **Idea 2, Direction 2**: MC context → AI code editor (read direction). Direction 1 (session tracing back into MC) is explicitly out of scope for this hackathon.
+---
 
-## The Demo Story
+## Context
 
-A data engineer is modifying a dbt model in Claude Code. Without leaving their editor, they:
-1. Get immediate awareness of the table's health, active alerts, and downstream dependencies
-2. Receive a suggestion to add a validation monitor for new logic they're adding
-3. See the generated monitor YAML applied to MC via the CLI — all in one flow
+### What has been built
+- `skills/monte-carlo/SKILL.md` — the core skill file, fully tested
+- `skills/monte-carlo/TROUBLESHOOTING.md` — common setup and runtime issues
+- `analysis/` — PR analysis and test results (internal, keep but not featured)
+- `demo/scenario.md` — demo script (internal reference)
 
-## What We're Building
+### Target user
+MC data engineers who use Claude Code, Cursor, or other AI editors with
+MCP support. Technical users comfortable with terminal and config files.
+They are NOT familiar with the Monte Carlo plugin — this is their first time
+setting it up.
 
-### Core Deliverable: `SKILL.md`
-A markdown skill file (`~/.claude/skills/monte-carlo/SKILL.md`) that teaches Claude Code when and how to use Monte Carlo's existing MCP tools. This is the heart of the project. The format follows the open Agent Skills spec, making it compatible with Claude Code, Cursor, and other AI editors.
+### Target stack
+dbt + Snowflake + Airflow (MC's internal data stack)
 
-### Supporting Deliverables
-- MCP server configuration snippet (for Claude Code, Cursor, VS Code)
-- `README.md` with setup instructions
-- Demo scenario: a scripted dbt model change against the dev environment
+### Repo visibility
+Private. Internal launch only — do not add any public-facing language.
 
-## Monte Carlo MCP Server
+---
 
-Already built and publicly available. No need to build MCP infrastructure.
+## Deliverable 1: README.md
 
-**Endpoint:** `https://integrations.getmontecarlo.com/mcp/`
+Write `README.md` in the repo root. It must be clear enough that a data
+engineer can go from zero to verified working in under 10 minutes.
 
-**Auth:** MCP-specific API key (not standard API key). Created via MC UI → Settings → API Keys → MCP Server type. Key format: `<KEY_ID>:<KEY_SECRET>`
+### Structure
 
-**MCP config for Claude Code** (`~/.claude/claude.json` or `.mcp.json`):
+```
+# Monte Carlo AI Editor Plugin
+
+## What this does
+[2-3 sentences: what the plugin is, what it does for a data engineer,
+which editors it works with]
+
+## Prerequisites
+- Claude Code, Cursor, or VS Code with MCP support
+- Node.js (LTS) + npm installed
+- Monte Carlo account with Editor role or above
+- MC CLI installed (for monitor deployment)
+
+## Setup
+
+### Step 1 — Create an MCP server key
+[Instructions: MC UI → Settings → API Keys → Add → MCP Server type]
+[Note: MCP keys are separate from standard API keys]
+
+### Step 2 — Install the SKILL.md
+[Single curl command to install the skill to ~/.claude/skills/monte-carlo/]
+
+### Step 3 — Configure your MCP server
+[Show the exact JSON snippet for Claude Code / Cursor / VS Code]
+[Use x-mcd-id and x-mcd-token header format]
+[MCP endpoint: https://integrations.getmontecarlo.com/mcp/]
+
+### Step 4 — Verify the connection
+[One test prompt to paste into Claude Code to confirm everything works]
+
+## How to use it
+[Brief description of the 4 workflows — what triggers them, what they do]
+[Emphasize: do not ask for it — it activates automatically]
+
+## Troubleshooting
+[Link to TROUBLESHOOTING.md]
+```
+
+### Requirements for the README
+- Every command must be copy-pasteable — no placeholders left unfilled except
+  `<KEY_ID>` and `<KEY_SECRET>` which are user-specific
+- The SKILL.md install step should be a single curl or cp command, not
+  manual file creation
+- Keep it under 150 lines — data engineers won't read a long README
+- Tone: direct and technical, no marketing language
+- Do not mention the hackathon, demo video, or internal project history
+
+---
+
+## Deliverable 2: Repo Polish
+
+Review the repo and make the following changes:
+
+### Folder structure — confirm or create
+```
+monte-carlo-claude-plugin/
+├── CLAUDE.md                          # current session brief (keep)
+├── README.md                          # create this session
+├── skills/
+│   └── monte-carlo/
+│       ├── SKILL.md                   # core deliverable
+│       └── TROUBLESHOOTING.md         # already exists
+├── analysis/                          # internal — keep but add .gitkeep
+│   ├── session_a_pr_analysis.md
+│   └── session_b_test_results.md
+├── demo/
+│   └── scenario.md                    # internal reference
+└── .mcp.json.example                  # create this session (see below)
+```
+
+### Create `.mcp.json.example`
+A ready-to-use MCP config template that engineers can copy directly:
 ```json
 {
   "mcpServers": {
@@ -51,75 +130,65 @@ Already built and publicly available. No need to build MCP infrastructure.
 }
 ```
 
-**Available MCP Tools:**
-
-| Tool | Purpose |
-|---|---|
-| `testConnection` | Verify auth and connectivity |
-| `search` | Find tables/assets by name |
-| `getTable` | Schema, stats, metadata for a table |
-| `getTableLineage` | Upstream/downstream dependencies |
-| `getAlerts` | Active incidents and alerts |
-| `getQueriesForTable` | Recent query history |
-| `getQueryData` | Full SQL for a specific query |
-| `createValidationMonitorMac` | Generate monitors-as-code YAML |
-| `getValidationPredicates` | List available validation rule types |
-| `updateAlert` | Update alert status/severity |
-| `setAlertOwner` | Assign alert ownership |
-| `createOrUpdateAlertComment` | Add comments to alerts |
-| `getDomains` | List MC domains |
-| `getUser` | Current user info |
-| `getCurrentTime` | ISO timestamp for API calls |
-
-**Applying generated monitor YAML:**
-```bash
-montecarlo monitors apply --file <generated-yaml-file>
+### Create `.gitignore` if not present
+```
+.env
+*.key
+.mcp.json         # actual config with real keys — never commit
+node_modules/
+.DS_Store
 ```
 
-## Dev Environment
+### Clean up
+- Remove any temporary files, scratch notes, or dev artifacts not listed
+  in the target folder structure above
+- Ensure all markdown files have consistent heading styles
+- Do not delete `analysis/` — it is useful internal history
 
-- **Stack:** dbt + Snowflake + Airflow
-- **MC environment:** dev (not production)
-- Data may be less rich than production but sufficient for demo
+---
 
-## Reference: Braintrust Claude Code Plugin
-- Repo: https://github.com/braintrustdata/braintrust-claude-plugin
-- Blog: https://www.braintrust.dev/blog/claude-code-braintrust-integration
-- Their approach: two plugins — `trace-claude-code` (session tracing) + `braintrust` (SKILL.md bringing data into editor)
-- We are building the equivalent of their `braintrust` skill (Direction 2 only)
+## Deliverable 3: Launch Artifacts
 
-## Repository Structure (target)
-```
-monte-carlo-claude-plugin/
-├── CLAUDE.md                    # This file
-├── README.md                    # Setup instructions for end users
-├── skills/
-│   └── monte-carlo/
-│       └── SKILL.md             # Core deliverable
-├── demo/
-│   └── scenario.md              # Demo script and example prompts
-└── .mcp.json.example            # MCP config template
-```
+### 3a — Slack message
+Save as `launch/slack_message.md`
 
-## Time Budget (10 hours total)
-1. **Hour 1** — Environment verification: MCP connectivity, dev data check, CLI apply test
-2. **Hours 2–4** — Write and iterate on SKILL.md
-3. **Hours 5–6** — Demo scenario setup and end-to-end testing
-4. **Hour 7** — README + repo polish
-5. **Hours 8–10** — Buffer: debugging, rehearsal, stretch goals
+Write a Slack message for the MC data engineering team channel.
+Tone: casual, collegial, internally focused. Not a press release.
 
-## Failure Risks (watch for these)
-1. **Dev environment data too sparse** — verify lineage, alerts, and dbt models exist before writing SKILL.md
-2. **Claude Code not triggering MC tools unprompted** — script demo prompts carefully; soft proactivity is fine
-3. **`montecarlo monitors apply` CLI step failing** — test this early; have a YAML-display fallback
-4. **`mcp-remote` connectivity issues** — test on the exact demo machine and network
-5. **Scope creep on SKILL.md** — lock scope by hour 4
+It should include:
+- One sentence on what this is
+- Two concrete examples of what it does (pick from the test results:
+  e.g. filter change on client_hub_master surfacing 315 downstream tables,
+  or the timeseries_detector_routing rename being redirected to a safe
+  transition strategy)
+- Link to the repo and README for setup
+- An ask: try it on a real model and share feedback in a thread
 
-## Out of Scope (this hackathon)
-- Direction 1: session tracing back into MC
-- Claude Code lifecycle hooks (hard proactivity)
-- Formal `.claude-plugin/` marketplace packaging
-- Cursor/VS Code specific demos (SKILL.md works there but don't spend time on it)
+Keep it under 150 words. No headers, no bullet lists — write it as you
+would actually send it in Slack.
 
-## Strategic Context
-This project maps to MC's "Call-0: Transitions and Validations" roadmap item. The goal is to expand WAUs beyond monitoring/troubleshooting by creating new entry points into MC through AI coding workflows. If successful, this POC is intended for production development — winning the hackathon is secondary to building a solid foundation.
+### 3b — Internal setup guide
+Save as `launch/setup_guide.md`
+
+A slightly more detailed companion to the README, tailored specifically
+for MC's internal stack. Differences from the README:
+- References MC's actual dbt repo path conventions
+- Includes a suggested first test: open a model from the
+  `criticality_score` or `timeseries` domain (highest-impact models
+  from PR analysis) and reference it in Claude Code
+- Includes a note on the monitors workflow: this is a new practice for
+  the team — Workflow 2 will offer to generate monitor YAML, which can
+  then be applied with `montecarlo monitors apply`
+- Includes a feedback section: where to share issues or suggestions
+  (Slack channel or GitHub issues on the private repo)
+
+Keep it under 200 lines.
+
+---
+
+## What NOT to do
+- Do not modify SKILL.md
+- Do not make the repo public
+- Do not add any customer-facing or external-launch language
+- Do not create a formal changelog or versioning system yet —
+  that comes when we launch externally

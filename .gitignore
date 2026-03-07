@@ -5,6 +5,7 @@ node_modules/
 .DS_Store
 .venv/
 target/
+CLAUDE.md
 
 # Demo runtime artifacts (keep locally, don't commit)
 demo/.claude/
