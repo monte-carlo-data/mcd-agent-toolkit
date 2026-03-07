@@ -179,9 +179,15 @@ When the user adds a new column, filter, or business rule, suggest adding a moni
 Then run the appropriate sequence:
 
 ```
-1. For validation monitors: getValidationPredicates() → show what validation types are available
+1. Read the SQL file being edited to extract the specific transformation logic:
+   - Confirm the file path from conversation context (do not guess or assume)
+   - If no file path is clear, ask the engineer: "Which file contains the new logic?"
+   - Extract the specific new column definition, filter condition, or business rule
+   - Use this logic directly when constructing the monitor condition in step 3
+
+2. For validation monitors: getValidationPredicates() → show what validation types are available
    For all types: determine the right tool from the selection guide above
-2. Call the selected create*MonitorMac tool:
+3. Call the selected create*MonitorMac tool:
    - createValidationMonitorMac(mcon, description, condition_sql) → returns YAML
    - createMetricMonitorMac(mcon, description, metric, operator) → returns YAML
    - createComparisonMonitorMac(source_table, target_table, metric) → returns YAML
@@ -282,6 +288,14 @@ When the user is about to rename or drop a column, change a join condition, alte
 5. getQueriesForTable(mcon="<mcon>")
    → recent queries; scan for references to the specific columns being changed
    → use getQueryData(query_id="<id>") to fetch full SQL for ambiguous cases
+
+5b. Supplementary local search for downstream dbt refs:
+   - Search the local models/ directory for ref('<table_name>') (single-hop only)
+   - Compare results against getAssetLineage output from step 2
+   - If any local models reference this table but are NOT in MC's lineage results:
+     "⚠️ Found N local model(s) referencing this table not yet in MC's lineage: [list]"
+   - If no models/ directory exists in the current project, skip silently
+   - MC lineage remains the authoritative source — local grep is supplementary only
 
 6. getMonitors(mcon="<mcon>")
    → which monitors are watching columns or metrics affected by the change
