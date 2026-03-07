@@ -51,6 +51,20 @@ This applies whenever the user expresses intent to modify a model — including 
 - "Can you add / modify / refactor…"
 - "Let's add…" / "Add a `<column>` column"
 - Any other description of a planned schema or logic change
+- "Exclude / filter out / remove [records/customers/rows]…"
+- "Adjust / increase / decrease [threshold/parameter/value]…"
+- "Fix / bugfix / patch [issue/bug]…"
+- "Revert / restore / undo [change/previous behavior]…"
+- "Disable / enable [feature/logic/flag]…"
+- "Clean up / remove [references/columns/code]…"
+- "Implement [backend/feature] for…"
+- "Create [models/dbt models] for…" (when modifying existing referenced tables)
+- "Increase / decrease / change [max_tokens/threshold/date constant/numeric parameter]…"
+- Any change to a hardcoded value, constant, or configuration parameter within SQL
+
+Parameter changes (threshold values, date constants, numeric limits) appear
+safe but silently change model output. Treat them the same as logic changes
+for impact assessment purposes.
 
 **Do not write or edit any SQL until the change impact assessment (Workflow 4) has been presented to the user.** The assessment must come first — not after the edit, not in parallel.
 
@@ -120,6 +134,29 @@ When auto-escalating, tell the user explicitly:
 > "This table has [alerts / key asset dependents / high importance] — running a full change impact assessment before you proceed."
 
 Do not silently run Workflow 4 without narrating the reason.
+
+When auto-escalating from Workflow 1 to Workflow 4, and after the full
+impact report is presented, carry the health check findings into the
+code suggestion:
+- Reference the specific alerts found when explaining why you recommend
+  a particular approach
+- Do not write code that ignores active alerts without flagging the risk
+
+### New model creation variant
+
+When the user is creating a new .sql dbt model file (not editing an existing one):
+
+1. Parse all {{ ref('...') }} and {{ source('...', '...') }} calls from the SQL
+2. For each referenced table, run the standard Workflow 1 health check:
+   search() → getTable() → getAlerts()
+3. Surface a consolidated upstream health summary:
+   "Your new model references N upstream tables. Here's their current health:"
+   - List each with: last updated, active alerts (if any), key asset flag
+4. Flag any upstream table with active alerts as a risk:
+   "⚠️ <table_name> has <N> active alerts — your new model will inherit this data quality issue"
+
+Skip getAssetLineage for new models — they have no downstream dependents yet.
+Skip Workflow 4 for new models — there is no existing blast radius to assess.
 
 ### 2. Add a monitor — when new transformation logic is added
 
@@ -208,6 +245,20 @@ To respond to an alert:
 
 **Trigger:** Any expressed intent to add, rename, drop, or change a column, join, filter, or model logic. Run this immediately — before writing any code — even if the user hasn't asked for it.
 
+### Bugfixes and reverts require impact assessment too
+
+When the user says "fix", "revert", "restore", or "undo", run this workflow
+before writing any code — even if the change seems small or safe.
+
+A revert that undoes a column addition or changes join logic has the same
+blast radius as the original change. Downstream models may have already
+adapted to the "incorrect" behavior, meaning the fix itself could break them.
+
+Pay special attention to:
+- Whether the revert removes a column other models now depend on
+- Whether downstream models reference the specific logic being reverted
+- Whether active alerts may be related to the change being reverted
+
 When the user is about to rename or drop a column, change a join condition, alter a filter, or refactor a model's logic, run this sequence to surface the blast radius before any changes are committed:
 
 ```
@@ -244,6 +295,22 @@ Assess and report a **risk tier**:
 | 🟡 Medium | Non-key assets downstream, OR monitors on affected columns, OR moderate query volume |
 | 🟢 Low | No downstream dependents, no active alerts, low query volume |
 
+### Multi-model changes
+
+When the user is changing multiple models in the same session or same domain
+(e.g., 3 timeseries models, 4 criticality_score models):
+
+- Run a single consolidated impact assessment across all changed tables
+- Deduplicate downstream dependents — if two changed tables share a downstream
+  dependent, count it once and note that it's affected by multiple upstream changes
+- Present a unified blast radius report rather than N separate reports
+- Escalate risk tier if the combined blast radius is larger than any individual table
+
+Example consolidated report header:
+"## Change Impact: 3 models in timeseries domain
+Combined downstream blast radius: 28 tables (deduplicated)
+Highest risk table: timeseries_detector_routing (22 downstream refs)"
+
 Report format:
 ```
 ## Change Impact: <table_name>
@@ -279,6 +346,46 @@ If risk is 🔴 High:
    - Notifying owners of downstream key assets (`setAlertOwner` / `createOrUpdateAlertComment` on active alerts)
    - Adding a monitor for the new logic before deploying (Workflow 2)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
+
+### Synthesis: translate findings into code recommendations
+
+After presenting the impact report, use the findings to shape your code suggestion.
+Do not present MC data and then write code as if the data wasn't there.
+Explicitly connect each key finding to a specific recommendation:
+
+- Active alerts firing on the table:
+  → Recommend deferring or minimally scoping the change until alerts are resolved
+  → Explain: "There are N active alerts on this table — making this change now
+     risks compounding an existing data quality issue"
+
+- Key assets downstream:
+  → Recommend defensive coding patterns: null guards, backward-compatible changes,
+     additive-only schema changes where possible
+  → Explain: "X downstream key assets depend on this table — I'd recommend
+     writing this as [specific pattern] to avoid breaking [specific dependent]"
+
+- Monitors on affected columns:
+  → Call out that the change will affect monitor coverage
+  → Recommend updating monitors alongside the code change (offer Workflow 2)
+  → Explain: "The existing monitor on [column] will need to be updated to
+     account for this change"
+
+- Zero custom monitor coverage:
+  → Proactively offer Workflow 2 before writing any code
+  → Explain: "This table has no custom monitors — I'd recommend adding one
+     for the new logic before deploying"
+
+- High read volume (>50 reads/day):
+  → Recommend extra caution around column renames or removals
+  → Suggest backward-compatible transition (add new column, deprecate old one)
+  → Explain: "This table has [N] reads/day — a column rename without a
+     transition period would break downstream consumers immediately"
+
+Always end the synthesis with one clear, specific recommendation in plain English:
+"Given the above, I recommend: [specific action]"
+
+Never write code that contradicts the findings without explicitly acknowledging
+the risk and getting confirmation from the engineer.
 
 ## Important parameter notes
 
