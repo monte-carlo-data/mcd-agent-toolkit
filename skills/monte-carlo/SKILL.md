@@ -20,7 +20,9 @@ This skill brings Monte Carlo's data observability context directly into your ed
 - References or opens a `.sql` file or dbt model (files in `models/`) → run Workflow 1
 - Mentions a table name, dataset, or dbt model name in passing → run Workflow 1
 - Describes a planned change to a model (new column, join update, filter change, refactor) → **STOP — run Workflow 4 before writing any code**
-- Adds new transformation logic → run Workflow 2 to suggest a monitor
+- Adds a new column, metric, or output expression to an existing
+  model → run Workflow 4 first, then ALWAYS offer Workflow 2
+  regardless of risk tier — do not skip the monitor offer
 - Asks about data quality, freshness, row counts, or anomalies → run Workflow 1
 - Wants to triage or respond to a data quality alert → run Workflow 3
 
@@ -420,10 +422,14 @@ Explicitly connect each key finding to a specific recommendation:
   → Explain: "The existing monitor on [column] will need to be updated to
      account for this change"
 
-- Zero custom monitor coverage:
-  → Proactively offer Workflow 2 before writing any code
-  → Explain: "This table has no custom monitors — I'd recommend adding one
-     for the new logic before deploying"
+- New output column or logic being added:
+  → Always offer Workflow 2 after the impact assessment, regardless
+    of existing monitor coverage
+  → Do not skip this step even if risk tier is 🟢 Low
+  → Say explicitly: "This adds new output logic — would you like me
+    to generate a monitor for it? I can add a null check, range
+    validation, or custom SQL rule."
+  → Wait for the user's response before proceeding with the edit
 
 - High read volume (>50 reads/day):
   → Recommend extra caution around column renames or removals
