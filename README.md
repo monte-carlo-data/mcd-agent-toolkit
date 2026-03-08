@@ -96,6 +96,34 @@ Open your dbt project (or any data engineering codebase) in your editor. From th
 
 **Workflow 4 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
 
+### Step 5 — Configure tool permissions (recommended)
+
+By default Claude Code will prompt for permission on each Monte Carlo
+MCP tool call. To allow the skill to run without interruption, choose
+one of the following:
+
+**Option A — Add to allow list (recommended)**
+Add the following to `.claude/settings.local.json` in your project:
+```json
+{
+  "allowedTools": [
+    "mcp__monte-carlo__*",
+    // or add each tool individually
+    // "mcp__monte-carlo__getTable",
+  ]
+}
+```
+
+This allows all Monte Carlo read operations without prompting, while
+keeping write operations (file edits, CLI commands) under your control.
+
+**Option B — Skip all permissions (use with caution)**
+```bash
+claude --dangerously-skip-permissions
+```
+This bypasses all permission checks including file edits and CLI
+commands. Only use this in a safe, non-production environment.
+
 ### Deploying generated monitors
 
 When Claude generates a monitor, it saves the YAML to `monitors/<table>.yml`. Deploy with:
