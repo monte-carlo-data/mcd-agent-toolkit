@@ -67,7 +67,9 @@ Add the Monte Carlo MCP server to your project `.mcp.json` or global `~/.claude/
         "--header",
         "x-mcd-id: <KEY_ID>",
         "--header",
-        "x-mcd-token: <KEY_SECRET>"
+        "x-mcd-token: <KEY_SECRET>",
+        "--header",
+        "x-mcd-source: editor-skill-1.0"
       ]
     }
   }
