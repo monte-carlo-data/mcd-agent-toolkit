@@ -143,4 +143,4 @@ default_resource: <your-warehouse-name>
 
 ## Troubleshooting
 
-See [TROUBLESHOOTING.md](skills/monte-carlo/TROUBLESHOOTING.md) for common setup and runtime issues.
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common setup and runtime issues.
