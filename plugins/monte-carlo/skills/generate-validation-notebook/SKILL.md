@@ -600,7 +600,7 @@ Cells are ordered consistently for both model types, following this sequence:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/generate_notebook_url.py /tmp/validation_notebook_working/<id>/notebook.yaml --mc-base-url <MC_BASE_URL>
 ```
-3. If YAML validation fails, fix and re-run before proceeding.
+3. The script validates both YAML syntax and notebook schema (required fields on metadata and cells). If validation fails, read the error messages carefully, fix the YAML to match the spec in Phase 4, and re-run.
 
 ## Phase 6: Output
 

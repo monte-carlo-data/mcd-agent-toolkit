@@ -35,11 +35,68 @@ def sanitize_yaml(content: str) -> str:
 
 
 def validate_yaml(content: str) -> None:
-    """Parse YAML and exit with context on failure."""
+    """Parse YAML, validate notebook schema, and exit with context on failure."""
     try:
-        yaml.safe_load(content)
+        doc = yaml.safe_load(content)
     except yaml.YAMLError as e:
         print(f"YAML validation failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    errors: list[str] = []
+
+    # Top-level structure
+    if not isinstance(doc, dict):
+        errors.append("Root must be a mapping")
+    else:
+        if "version" not in doc:
+            errors.append("Missing top-level 'version'")
+        metadata = doc.get("metadata")
+        if not isinstance(metadata, dict):
+            errors.append("Missing or invalid 'metadata' mapping")
+        else:
+            for field in ("id", "name", "created_at", "updated_at"):
+                if field not in metadata:
+                    errors.append(f"metadata.{field}: missing required field")
+            for bad_field in ("title", "description", "pr_number", "generated_by"):
+                if bad_field in metadata:
+                    errors.append(
+                        f"metadata.{bad_field}: unexpected field (use 'name' for the notebook title)"
+                    )
+
+        cells = doc.get("cells")
+        if not isinstance(cells, list):
+            errors.append("Missing or invalid 'cells' list")
+        else:
+            for i, cell in enumerate(cells):
+                prefix = f"cells[{i}]"
+                if not isinstance(cell, dict):
+                    errors.append(f"{prefix}: must be a mapping")
+                    continue
+                if "id" not in cell:
+                    errors.append(f"{prefix}: missing 'id'")
+                if "type" not in cell:
+                    errors.append(f"{prefix}: missing 'type'")
+                cell_type = cell.get("type")
+                if cell_type not in ("sql", "markdown", "parameter"):
+                    errors.append(
+                        f"{prefix}: invalid type '{cell_type}' (must be sql, markdown, or parameter)"
+                    )
+                if "display_type" not in cell:
+                    errors.append(f"{prefix}: missing 'display_type'")
+                if cell_type == "parameter":
+                    content_val = cell.get("content")
+                    if not isinstance(content_val, dict):
+                        errors.append(f"{prefix}: parameter cell 'content' must be a mapping with 'name' and 'config'")
+                    else:
+                        if "name" not in content_val:
+                            errors.append(f"{prefix}: parameter content missing 'name'")
+                        if "config" not in content_val:
+                            errors.append(f"{prefix}: parameter content missing 'config'")
+
+    if errors:
+        print("Invalid notebook:", file=sys.stderr)
+        for err in errors:
+            print(f"  - {err}", file=sys.stderr)
         sys.exit(1)
 
 
