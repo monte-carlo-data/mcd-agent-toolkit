@@ -1,13 +1,15 @@
 ## Troubleshooting
 
-**MCP connection fails:**
+### MCP connection fails:
 ```bash
 # Verify the server is reachable
 curl -s -o /dev/null -w "%{http_code}" https://integrations.getmontecarlo.com/mcp/
 ```
 Check that `x-mcd-id` and `x-mcd-token` are set correctly in your MCP config. The key format is `<KEY_ID>:<KEY_SECRET>` — these are split across two separate headers.
 
-**Monitor creation errors:**
+
+### Monitor creation errors:
+
 **`montecarlo monitors apply` fails with "Unknown field":**
 Monitor definition files must have `montecarlo:` as the root key — do not copy the `validation:` or `custom_sql:` output from the MCP tools directly. Reformat using the `montecarlo: > custom_sql:` structure shown in Workflow 2.
 
