@@ -6,6 +6,7 @@ Public Claude Code skills by [Monte Carlo Data](https://www.montecarlodata.com/)
 
 ```
 /plugin marketplace add monte-carlo-data/mcd-skills
+/plugin install monte-carlo@mcd-skills
 ```
 
 ## Available Skills
