@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument("yaml_path", help="Path to notebook YAML file")
     parser.add_argument(
         "--mc-base-url",
-        default="https://pr-11955.getmontecarlo.com",
+        default="https://getmontecarlo.com",
         help="MC Bridge base URL",
     )
     args = parser.parse_args()

@@ -10,7 +10,7 @@ Generate a SQL Notebook with validation queries for dbt changes.
 
 Parse the arguments:
 - **Target** (required): first argument — a GitHub PR URL or local dbt repo path
-- **MC Base URL** (optional): `--mc-base-url <URL>` — defaults to `https://pr-11955.getmontecarlo.com`
+- **MC Base URL** (optional): `--mc-base-url <URL>` — defaults to `https://getmontecarlo.com`
 
 ---
 
