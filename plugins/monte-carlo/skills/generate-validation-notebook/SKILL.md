@@ -11,6 +11,7 @@ Generate a SQL Notebook with validation queries for dbt changes.
 Parse the arguments:
 - **Target** (required): first argument — a GitHub PR URL or local dbt repo path
 - **MC Base URL** (optional): `--mc-base-url <URL>` — defaults to `https://getmontecarlo.com`
+- **Models** (optional): `--models <model1,model2,...>` — comma-separated list of model filenames (without `.sql` extension) to generate queries for. Only these models will be included. By default, all changed models are included up to a maximum of 10.
 
 ---
 
@@ -171,6 +172,19 @@ find . -name "dbt_project.yml" -type f | head -1
    - **Title**: `Local: <branch-name>`
    - **Author**: Output of `git config user.name`
    - **Merged**: "N/A (local)"
+
+### Model Selection (applies to both modes)
+
+After filtering to `.sql` files under `models/` or `snapshots/`:
+
+1. **If `--models` was specified:** Filter the changed files list to only include models whose filename (without `.sql` extension, case-insensitive) matches one of the specified model names. If any specified model is not found in the changed files, warn the user but continue with the models that were found. If none match, report that and stop.
+
+2. **Model cap:** If more than 10 models remain after filtering, select the first 10 (by file path order) and warn the user:
+   ```
+   ⚠️ <total_count> models changed — generating validation queries for the first 10 only.
+   To generate for specific models, re-run with: --models <model1,model2,...>
+   Skipped models: <list of skipped model filenames>
+   ```
 
 ## Phase 2: Parse Changed Models
 
@@ -596,8 +610,10 @@ Present:
 ## Summary
 - **Source:** PR #<number> - <title> OR Local: <branch>
 - **Author:** <author>
-- **Changed Models:** <count> models
+- **Changed Models:** <count> models (of <total_count> changed)
 - **Generated Queries:** <count> queries
+
+> ⚠️ If models were capped: "Only the first 10 of <total_count> changed models were included. Re-run with `--models` to select specific models."
 
 ## Notebook Opened
 The notebook has been opened directly in your browser.
