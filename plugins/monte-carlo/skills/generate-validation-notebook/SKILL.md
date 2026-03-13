@@ -390,7 +390,7 @@ LIMIT 100
 ```
 
 #### Pattern 1: Changed Field Distribution
-**Trigger:** Changed fields found in Phase 2b.
+**Trigger:** Changed fields found in Phase 2b. **Exclude added columns** (from "New columns" in Phase 2b) — only include fields that exist in baseline.
 
 ```sql
 SELECT
@@ -426,6 +426,18 @@ LIMIT 100
 #### Pattern 6: NULL Rate Check
 **Trigger:** New column added, or column wrapped in COALESCE/NULLIF.
 
+**Important:** Added columns (from "New columns" in Phase 2b) do NOT exist in baseline yet. For added columns, query `{{dev_db}}` only. For modified columns (COALESCE/NULLIF changes), compare both databases.
+
+**For added columns** (dev only):
+```sql
+SELECT
+    COUNT(*) AS total_rows,
+    SUM(CASE WHEN <column> IS NULL THEN 1 ELSE 0 END) AS null_count,
+    ROUND(100.0 * SUM(CASE WHEN <column> IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS null_pct
+FROM {{dev_db}}.<SCHEMA>.<TABLE_NAME>
+```
+
+**For modified columns** (baseline vs dev):
 ```sql
 SELECT
     'baseline' AS source,
@@ -458,6 +470,8 @@ LIMIT 30
 
 #### Pattern 3: Before/After Comparison
 **Trigger:** Always (for changed fields + top segmentation field). **Modified models only.**
+
+**Important:** Exclude added columns (from "New columns" in Phase 2b) from `<group_fields>`. Only use fields that exist in BOTH baseline and dev. Added columns don't exist in baseline and will cause query errors.
 
 ```sql
 WITH baseline AS (
@@ -643,11 +657,11 @@ Select your Snowflake connector in the notebook interface to begin running queri
 | 7 / 7-new | Total Row Count | Always | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 1 |
 | 9 | Sample Data Preview | Always | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 2 |
 | 2 / 2-new | Core Segmentation Counts | Always | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 3 |
-| 1 | Changed Field Distribution | Column modified in diff | Modified only | `{{baseline_db}}` | 4 |
+| 1 | Changed Field Distribution | Column modified in diff (not added) | Modified only | `{{baseline_db}}` | 4 |
 | 5 | Uniqueness Check | JOIN/unique_key changed (modified) / Always (new) | Both | `{{dev_db}}` | 5 |
-| 6 / 6-new | NULL Rate Check | New column or COALESCE (modified) / Always (new) | Both | Both (modified) / `{{dev_db}}` (new) | 5 |
+| 6 / 6-new | NULL Rate Check | New column or COALESCE (modified) / Always (new) | Both | Added col: `{{dev_db}}` only; COALESCE: Both (modified) / `{{dev_db}}` (new) | 5 |
 | 8 | Time-Axis Continuity | Incremental or time field | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 5 |
-| 3 | Before/After Comparison | Changed fields | Modified only | Both | 6 |
+| 3 | Before/After Comparison | Changed fields (not added) | Modified only | Both | 6 |
 | 7b | Row Count Comparison | Always | Modified only | Both | 6 |
 
 ## MC Bridge Setup Help
