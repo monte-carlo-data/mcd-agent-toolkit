@@ -47,10 +47,10 @@ The output is an import URL that opens directly in the notebook interface:
 ```
 
 **Key Features:**
-- **Database Parameters**: Two `text` parameters (`baseline_db` and `dev_db`) for selecting databases
+- **Database Parameters**: Two `text` parameters (`prod_db` and `dev_db`) for selecting databases
 - **Schema Inference**: Automatically infers schema per model from `dbt_project.yml` and model configs
-- **Single-table queries**: Basic validation queries using `{{baseline_db}}.<SCHEMA>.<TABLE>`
-- **Comparison queries**: Before/after queries comparing `{{baseline_db}}` vs `{{dev_db}}`
+- **Single-table queries**: Basic validation queries using `{{prod_db}}.<SCHEMA>.<TABLE>`
+- **Comparison queries**: Before/after queries comparing `{{prod_db}}` vs `{{dev_db}}`
 - **Flexible usage**: Users can set both parameters to the same database for single-database analysis
 
 # Notebook YAML Spec Reference
@@ -78,14 +78,14 @@ cells:
 Parameter cells allow defining variables referenced in SQL via `{{param_name}}` syntax:
 
 ```yaml
-- id: param-baseline-db
+- id: param-prod-db
   type: parameter
   content:
-    name: baseline_db              # variable name
+    name: prod_db              # variable name
     config:
       type: text                   # free-form text input
       default_value: "ANALYTICS"
-      placeholder: "Baseline database"
+      placeholder: "Prod database"
   display_type: table
 ```
 
@@ -261,11 +261,11 @@ For each changed model, generate the applicable queries based on its classificat
 
 Use **double curly braces** `{{...}}` for parameter placeholders. Do NOT use `${...}` or any other syntax.
 
-Correct: `{{baseline_db}}.PROD.AGENT_RUNS`
-Wrong: `${baseline_db}.PROD.AGENT_RUNS`
+Correct: `{{prod_db}}.PROD.AGENT_RUNS`
+Wrong: `${prod_db}.PROD.AGENT_RUNS`
 
 **Table Reference Format:**
-- Use `{{baseline_db}}.<SCHEMA>.<TABLE_NAME>` for baseline queries
+- Use `{{prod_db}}.<SCHEMA>.<TABLE_NAME>` for prod queries
 - Use `{{dev_db}}.<SCHEMA>.<TABLE_NAME>` for dev queries
 - `<SCHEMA>` is **hardcoded per-model** using the output from the schema resolution script
 
@@ -273,7 +273,7 @@ Wrong: `${baseline_db}.PROD.AGENT_RUNS`
 
 ### Query Patterns for NEW Models
 
-For new models, all queries target `{{dev_db}}` only. No comparison queries are generated since no baseline table exists.
+For new models, all queries target `{{dev_db}}` only. No comparison queries are generated since no prod table exists.
 
 #### Pattern 7-new: Total Row Count
 **Trigger:** Always.
@@ -357,14 +357,14 @@ LIMIT 30
 
 ### Query Patterns for MODIFIED Models
 
-For modified models, single-table queries use `{{baseline_db}}` and comparison queries use both.
+For modified models, single-table queries use `{{prod_db}}` and comparison queries use both.
 
 #### Pattern 7: Total Row Count
 **Trigger:** Always.
 
 ```sql
 SELECT COUNT(*) AS total_rows
-FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 ```
 
 #### Pattern 9: Sample Data Preview
@@ -372,7 +372,7 @@ FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
 
 ```sql
 SELECT *
-FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 LIMIT 20
 ```
 
@@ -383,21 +383,21 @@ LIMIT 20
 SELECT
     <segmentation_field>,
     COUNT(*) AS row_count
-FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 GROUP BY <segmentation_field>
 ORDER BY row_count DESC
 LIMIT 100
 ```
 
 #### Pattern 1: Changed Field Distribution
-**Trigger:** Changed fields found in Phase 2b. **Exclude added columns** (from "New columns" in Phase 2b) — only include fields that exist in baseline.
+**Trigger:** Changed fields found in Phase 2b. **Exclude added columns** (from "New columns" in Phase 2b) — only include fields that exist in prod.
 
 ```sql
 SELECT
     <changed_field>,
     COUNT(*) AS row_count,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS pct
-FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 GROUP BY <changed_field>
 ORDER BY row_count DESC
 LIMIT 100
@@ -426,7 +426,7 @@ LIMIT 100
 #### Pattern 6: NULL Rate Check
 **Trigger:** New column added, or column wrapped in COALESCE/NULLIF.
 
-**Important:** Added columns (from "New columns" in Phase 2b) do NOT exist in baseline yet. For added columns, query `{{dev_db}}` only. For modified columns (COALESCE/NULLIF changes), compare both databases.
+**Important:** Added columns (from "New columns" in Phase 2b) do NOT exist in prod yet. For added columns, query `{{dev_db}}` only. For modified columns (COALESCE/NULLIF changes), compare both databases.
 
 **For added columns** (dev only):
 ```sql
@@ -437,14 +437,14 @@ SELECT
 FROM {{dev_db}}.<SCHEMA>.<TABLE_NAME>
 ```
 
-**For modified columns** (baseline vs dev):
+**For modified columns** (prod vs dev):
 ```sql
 SELECT
-    'baseline' AS source,
+    'prod' AS source,
     COUNT(*) AS total_rows,
     SUM(CASE WHEN <column> IS NULL THEN 1 ELSE 0 END) AS null_count,
     ROUND(100.0 * SUM(CASE WHEN <column> IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS null_pct
-FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 UNION ALL
 SELECT
     'dev' AS source,
@@ -461,7 +461,7 @@ FROM {{dev_db}}.<SCHEMA>.<TABLE_NAME>
 SELECT
     CAST(<time_axis> AS DATE) AS day,
     COUNT(*) AS row_count
-FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 WHERE <time_axis> >= CURRENT_TIMESTAMP - INTERVAL '14' DAY
 GROUP BY day
 ORDER BY day DESC
@@ -471,12 +471,12 @@ LIMIT 30
 #### Pattern 3: Before/After Comparison
 **Trigger:** Always (for changed fields + top segmentation field). **Modified models only.**
 
-**Important:** Exclude added columns (from "New columns" in Phase 2b) from `<group_fields>`. Only use fields that exist in BOTH baseline and dev. Added columns don't exist in baseline and will cause query errors.
+**Important:** Exclude added columns (from "New columns" in Phase 2b) from `<group_fields>`. Only use fields that exist in BOTH prod and dev. Added columns don't exist in prod and will cause query errors.
 
 ```sql
-WITH baseline AS (
+WITH prod AS (
     SELECT <group_fields>, COUNT(*) AS cnt
-    FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+    FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
     GROUP BY <group_fields>
 ),
 dev AS (
@@ -486,10 +486,10 @@ dev AS (
 )
 SELECT
     COALESCE(b.<field>, d.<field>) AS <field>,
-    COALESCE(b.cnt, 0) AS cnt_baseline,
+    COALESCE(b.cnt, 0) AS cnt_prod,
     COALESCE(d.cnt, 0) AS cnt_dev,
     COALESCE(d.cnt, 0) - COALESCE(b.cnt, 0) AS diff
-FROM baseline b
+FROM prod b
 FULL OUTER JOIN dev d ON b.<field> = d.<field>
 ORDER BY ABS(diff) DESC
 LIMIT 100
@@ -499,7 +499,7 @@ LIMIT 100
 **Trigger:** Always. **Modified models only.**
 
 ```sql
-SELECT 'baseline' AS source, COUNT(*) AS row_count FROM {{baseline_db}}.<SCHEMA>.<TABLE_NAME>
+SELECT 'prod' AS source, COUNT(*) AS row_count FROM {{prod_db}}.<SCHEMA>.<TABLE_NAME>
 UNION ALL
 SELECT 'dev' AS source, COUNT(*) AS row_count FROM {{dev_db}}.<SCHEMA>.<TABLE_NAME>
 ```
@@ -518,18 +518,18 @@ metadata:
 
 ### 4b. Parameter Cells
 
-**Only include `baseline_db` if there are modified models.** If all models are new, only include `dev_db`.
+**Only include `prod_db` if there are modified models.** If all models are new, only include `dev_db`.
 
 ```yaml
 # Include ONLY if there are modified models:
-- id: param-baseline-db
+- id: param-prod-db
   type: parameter
   content:
-    name: baseline_db
+    name: prod_db
     config:
       type: text
       default_value: "ANALYTICS"
-      placeholder: "Baseline database (e.g., ANALYTICS)"
+      placeholder: "Prod database (e.g., ANALYTICS)"
   display_type: table
 
 # Always include:
@@ -557,12 +557,24 @@ metadata:
     - **Status:** <merge_timestamp or "Not yet merged" or "N/A (local)">
     ## Changes
     <brief description based on diff analysis>
+    ## Table of Contents
+    <For each model, list the query patterns that will actually be generated (based on Phase 3 triggers):>
+    - **`<SCHEMA>.<TABLE_NAME>`** (new / modified)
+      - Total Row Count
+      - Sample Data Preview
+      - Core Segmentation Counts
+      - Changed Field Distribution  _(modified only, if triggered)_
+      - Uniqueness Check  _(if triggered)_
+      - NULL Rate Check  _(if triggered)_
+      - Time-Axis Continuity  _(if triggered)_
+      - Before/After Comparison  _(modified only)_
+      - Row Count Comparison  _(modified only)_
     ## Changed Models
     - `<SCHEMA>.<TABLE_NAME>` (from `<file_path>`)
     ## How to Use
     1. Select your Snowflake connector above
     2. Set **dev_db** to your dev database (e.g., `PERSONAL_JSMITH`)
-    3. If modified models are present, set **baseline_db** to your baseline database (e.g., `ANALYTICS`)
+    3. If modified models are present, set **prod_db** to your prod database (e.g., `ANALYTICS`)
     4. Run single-table queries first, then comparison queries
   display_type: table
 ```
@@ -591,7 +603,7 @@ Cells are ordered consistently for both model types, following this sequence:
 
 **New models:**
 1. Summary markdown cell (note that model is new)
-2. Parameter cells (dev_db only — no baseline_db if all models are new)
+2. Parameter cells (dev_db only — no prod_db if all models are new)
 3. Total row count (Pattern 7-new)
 4. Sample data preview (Pattern 9)
 5. Core segmentation counts (Pattern 2-new)
@@ -599,7 +611,7 @@ Cells are ordered consistently for both model types, following this sequence:
 
 **Modified models:**
 1. Summary markdown cell
-2. Parameter cells (baseline_db, dev_db)
+2. Parameter cells (prod_db, dev_db)
 3. Total row count (Pattern 7)
 4. Sample data preview (Pattern 9)
 5. Core segmentation counts (Pattern 2)
@@ -640,10 +652,10 @@ Select your Snowflake connector in the notebook interface to begin running queri
 1. **Do NOT execute queries** -- only generate the notebook
 2. **Keep SQL readable** -- proper formatting and meaningful aliases
 3. **Include LIMIT 100** on queries that could return many rows
-4. **Use double curly braces** -- `{{baseline_db}}` NOT `${baseline_db}`
-5. **Use correct table format** -- `{{baseline_db}}.<SCHEMA>.<TABLE>` and `{{dev_db}}.<SCHEMA>.<TABLE>`
+4. **Use double curly braces** -- `{{prod_db}}` NOT `${prod_db}`
+5. **Use correct table format** -- `{{prod_db}}.<SCHEMA>.<TABLE>` and `{{dev_db}}.<SCHEMA>.<TABLE>`
 6. **Always use the schema resolution script** -- do NOT manually parse dbt_project.yml
-7. **Schema is NOT a parameter** -- only `baseline_db` and `dev_db` are parameters
+7. **Schema is NOT a parameter** -- only `prod_db` and `dev_db` are parameters
 8. **Skip ephemeral models** -- they have no physical table
 9. **Truncate notebook name** -- keep under 50 chars
 10. **Generate unique cell IDs** -- use pattern like `cell-p3-model-1`
@@ -654,13 +666,13 @@ Select your Snowflake connector in the notebook interface to begin running queri
 
 | Pattern | Name | Trigger | Model Type | Database | Order |
 |---------|------|---------|------------|----------|-------|
-| 7 / 7-new | Total Row Count | Always | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 1 |
-| 9 | Sample Data Preview | Always | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 2 |
-| 2 / 2-new | Core Segmentation Counts | Always | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 3 |
-| 1 | Changed Field Distribution | Column modified in diff (not added) | Modified only | `{{baseline_db}}` | 4 |
+| 7 / 7-new | Total Row Count | Always | Both | `{{prod_db}}` (modified) / `{{dev_db}}` (new) | 1 |
+| 9 | Sample Data Preview | Always | Both | `{{prod_db}}` (modified) / `{{dev_db}}` (new) | 2 |
+| 2 / 2-new | Core Segmentation Counts | Always | Both | `{{prod_db}}` (modified) / `{{dev_db}}` (new) | 3 |
+| 1 | Changed Field Distribution | Column modified in diff (not added) | Modified only | `{{prod_db}}` | 4 |
 | 5 | Uniqueness Check | JOIN/unique_key changed (modified) / Always (new) | Both | `{{dev_db}}` | 5 |
 | 6 / 6-new | NULL Rate Check | New column or COALESCE (modified) / Always (new) | Both | Added col: `{{dev_db}}` only; COALESCE: Both (modified) / `{{dev_db}}` (new) | 5 |
-| 8 | Time-Axis Continuity | Incremental or time field | Both | `{{baseline_db}}` (modified) / `{{dev_db}}` (new) | 5 |
+| 8 | Time-Axis Continuity | Incremental or time field | Both | `{{prod_db}}` (modified) / `{{dev_db}}` (new) | 5 |
 | 3 | Before/After Comparison | Changed fields (not added) | Modified only | Both | 6 |
 | 7b | Row Count Comparison | Always | Modified only | Both | 6 |
 
