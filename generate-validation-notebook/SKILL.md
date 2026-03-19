@@ -24,7 +24,7 @@ Parse the arguments:
 
 **Note:** Generated SQL uses ANSI-compatible syntax that works across Snowflake, BigQuery, Redshift, and Athena. Minor adjustments may be needed for specific warehouse quirks.
 
-This plugin includes two helper scripts in `${CLAUDE_PLUGIN_ROOT}/scripts/`:
+This skill includes two helper scripts in `${CLAUDE_PLUGIN_ROOT}/skills/generate-validation-notebook/scripts/`:
 
 - **`resolve_dbt_schema.py`** - Resolves dbt model output schemas from `dbt_project.yml` routing rules and model config overrides.
 - **`generate_notebook_url.py`** - Encodes notebook YAML into a base64 import URL and opens it in the browser.
@@ -207,7 +207,7 @@ For EACH changed dbt model `.sql` file, parse and extract:
 
 2. **Run the script** for each model:
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve_dbt_schema.py /tmp/validation_notebook_working/<id>/dbt_project.yml /tmp/validation_notebook_working/<id>/models/<path>/<model>.sql
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/generate-validation-notebook/scripts/resolve_dbt_schema.py /tmp/validation_notebook_working/<id>/dbt_project.yml /tmp/validation_notebook_working/<id>/models/<path>/<model>.sql
    ```
 
 3. **Error handling**: If the script fails, **STOP immediately** and report the error. Do NOT proceed with notebook generation if schema resolution fails.
@@ -612,7 +612,7 @@ Cells are ordered consistently for both model types, following this sequence:
 1. Write notebook YAML to `/tmp/validation_notebook_working/<id>/notebook.yaml`
 2. Run the URL generation script:
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/generate_notebook_url.py /tmp/validation_notebook_working/<id>/notebook.yaml --mc-base-url <MC_BASE_URL>
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/generate-validation-notebook/scripts/generate_notebook_url.py /tmp/validation_notebook_working/<id>/notebook.yaml --mc-base-url <MC_BASE_URL>
 ```
 3. The script validates both YAML syntax and notebook schema (required fields on metadata and cells). If validation fails, read the error messages carefully, fix the YAML to match the spec in Phase 4, and re-run.
 
