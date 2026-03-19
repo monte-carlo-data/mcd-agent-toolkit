@@ -5,8 +5,9 @@ description: |
     Surfaces Monte Carlo context — table health, active alerts, lineage, blast
     radius — before any code is written, and uses those findings to shape code
     recommendations. Generates and optionally deploys monitors for new transformation
-    logic. Do not wait to be asked: run the appropriate workflow as soon as a relevant
-    file or table is referenced.
+    logic. After a change is made, generates targeted SQL validation queries to
+    verify the change behaved as intended. Do not wait to be asked: run the
+    appropriate workflow as soon as a relevant file or table is referenced.
 version: 1.0.0
 ---
 
