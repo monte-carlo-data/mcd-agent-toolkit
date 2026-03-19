@@ -1,3 +1,3 @@
-[submodule "skills/monte-carlo"]
-	path = plugins/monte-carlo/skills/monte-carlo
+[submodule "plugins/monte-carlo/skills"]
+	path = plugins/monte-carlo/skills
 	url = git@github.com:monte-carlo-data/mcd-skills.git
