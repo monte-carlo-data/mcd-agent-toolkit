@@ -6,10 +6,6 @@ node_modules/
 .venv/
 target/
 **/CLAUDE.md
+.claude/
 
-# Demo runtime artifacts (keep locally, don't commit)
-demo/.claude/
-demo/models/
-demo/monitors/
-demo/montecarlo.yml
-demo/target/
+temp/*
