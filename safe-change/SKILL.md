@@ -182,7 +182,7 @@ IF risk signals exist but NO change intent has been expressed:
   describe your change and I'll run it automatically."
 → Do NOT run Workflow 4. Do NOT ask about running Workflow 4.
 
-### New model creation variant
+#### New model creation variant
 
 When the user is creating a new .sql dbt model file (not editing an existing one):
 
@@ -291,7 +291,7 @@ To respond to an alert:
 
 **Trigger:** Any expressed intent to add, rename, drop, or change a column, join, filter, or model logic. Run this immediately — before writing any code — even if the user hasn't asked for it.
 
-### Bugfixes and reverts require impact assessment too
+#### Bugfixes and reverts require impact assessment too
 
 When the user says "fix", "revert", "restore", or "undo", run this workflow
 before writing any code — even if the change seems small or safe.
@@ -349,7 +349,7 @@ Assess and report a **risk tier**:
 | 🟡 Medium | Non-key assets downstream, OR monitors on affected columns, OR moderate query volume |
 | 🟢 Low | No downstream dependents, no active alerts, low query volume |
 
-### Multi-model changes
+#### Multi-model changes
 
 When the user is changing multiple models in the same session or same domain
 (e.g., 3 timeseries models, 4 criticality_score models):
@@ -401,7 +401,7 @@ If risk is 🔴 High:
    - Adding a monitor for the new logic before deploying (Workflow 2)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
 
-### Synthesis: translate findings into code recommendations
+#### Synthesis: translate findings into code recommendations
 
 After presenting the impact report, use the findings to shape your code suggestion.
 Do not present MC data and then write code as if the data wasn't there.
@@ -458,6 +458,152 @@ Always end the synthesis with one clear, specific recommendation in plain Englis
 
 Never write code that contradicts the findings without explicitly acknowledging
 the risk and getting confirmation from the engineer.
+
+### 5. Change validation queries — after a code change is made
+
+**Trigger:** Explicit engineer intent only. Activate when the engineer says something like:
+- "generate validation queries", "validate this change", "I'm done with this change"
+- "let me test this", "write queries to check this", "ready to commit"
+
+**Required session context — do not activate without both:**
+1. Workflow 4 (change impact assessment) has run for this table in this session
+2. A file edit was made to a `.sql` or dbt model file for that same table
+
+**Do NOT activate automatically after file edits. Do NOT proactively offer after Workflow 4 or file edits. The engineer asks when they are ready.**
+
+---
+
+**What this workflow does**
+
+Using the context already in the session — the Workflow 4 findings, the file diff, and the `getTable` result — generate 3–5 targeted SQL validation queries that directly test whether this specific change behaved as intended.
+
+These are not generic templates. Use the semantic meaning of the change from Workflow 4 context: which columns changed and why, what business logic was affected, what downstream models depend on this table, and what monitors exist. A null check on a new `days_since_contract_start` column should verify it is never negative and never null for rows with a `contract_start_date` — not just check for nulls generically.
+
+---
+
+**Step 1 — Identify the change type from session context**
+
+From Workflow 4 findings and the file diff, classify the primary change. A change may span multiple types — classify the dominant one and note secondaries:
+
+- **New column** — a new output column was added to the SELECT
+- **Filter change** — a WHERE clause, IN-list, or CASE condition was modified
+- **Join change** — a JOIN condition or join target was modified
+- **Column rename or drop** — an existing output column was renamed or removed
+- **Parameter change** — a hardcoded threshold, constant, or numeric value was changed
+- **New model** — the file was newly created, no production baseline exists
+
+---
+
+**Step 2 — Determine warehouse context from Workflow 4**
+
+From the `getTable` result already in session context, extract:
+- **Fully qualified table name** — e.g. `analytics.prod_internal_bi.client_hub_master`
+- **Warehouse type** — Snowflake, BigQuery, Redshift, Databricks
+- **Schema** — already resolved, do not re-derive
+
+Use the correct SQL dialect for the warehouse type. Key differences:
+
+| Warehouse | Date diff | Current timestamp | Notes |
+|---|---|---|---|
+| Snowflake | `DATEDIFF('day', a, b)` | `CURRENT_TIMESTAMP()` | `QUALIFY` supported |
+| BigQuery | `DATE_DIFF(a, b, DAY)` | `CURRENT_TIMESTAMP()` | Use subquery instead of `QUALIFY` |
+| Redshift | `DATEDIFF('day', a, b)` | `GETDATE()` | |
+| Databricks | `DATEDIFF(a, b)` | `CURRENT_TIMESTAMP()` | |
+
+For the dev database, use the placeholder `<YOUR_DEV_DATABASE>` with a comment instructing the engineer to replace it. Do not guess the dev database name.
+
+---
+
+**Step 3 — Apply database targeting rules (mandatory)**
+
+These rules are not negotiable — violating them produces queries that will fail at runtime:
+
+- **Columns or logic that only exist post-change** → dev database only. Never query production for a column that doesn't exist there yet.
+- **Comparison queries (before vs after)** → both production and dev databases
+- **New model (no production baseline)** → dev database only for all queries
+- **Row count comparison** → always include, always query both databases
+
+---
+
+**Step 4 — Generate targeted validation queries**
+
+Always include a row count comparison regardless of change type — it's the baseline signal that something unexpected happened.
+
+Then generate change-specific queries based on what needs to be validated for this change type. Use the exact conditions, column names, and business logic from the diff and Workflow 4 findings — not generic placeholders. The goal for each change type:
+
+**New column:** Verify the column is non-null where it should be non-null (based on its business meaning), that its value range is plausible, and that its distribution makes sense given the underlying data. Query dev only.
+
+**Filter change:** Verify that only the intended rows were reclassified — generate a before/after count showing how many rows were added or removed by the new condition using the exact filter logic from the diff, and a sample of the rows that changed classification. The sample helps the engineer confirm the right records moved.
+
+**Join change:** Verify that the join didn't introduce duplicates — a uniqueness check on the join key is essential. Also verify row count didn't change unexpectedly. Query dev for uniqueness, both databases for row count.
+
+**Column rename or drop:** Verify the old column name is absent and the new column (if renamed) is present in the dev schema. Also verify that downstream models referencing the old column name are identified — use the local ref() grep results from Workflow 4 if available.
+
+**Parameter or threshold change:** Verify the distribution of values affected by the change — how many rows moved above or below the new threshold, and whether the count matches the engineer's expectation. Query both databases to compare before and after.
+
+**New model:** No production comparison possible. Verify row count is non-zero and plausible, sample rows look correct, and key columns are non-null. Query dev only.
+
+---
+
+**Step 5 — Add change-specific context to each query**
+
+For every query, include a SQL comment block that explains:
+- What the query is checking
+- What a healthy result looks like **for this specific change**
+- What would indicate a problem
+
+Derive this context from Workflow 4 findings. Use the business meaning of the change, not generic descriptions. For example, for adding `days_since_contract_start`:
+
+```sql
+/*
+Null rate check: days_since_contract_start (new column, dev only)
+What to look for:
+  - Null count should equal workspaces with no contract_start_date
+  - All rows with contract_start_date should have a non-null, non-negative value
+  - Values above 3650 (~10 years) are suspicious and may indicate a data issue
+*/
+```
+
+This is what differentiates these queries from generic validation — the comment tells the engineer exactly what pass and fail look like for their specific change.
+
+---
+
+**Step 6 — Save to local file**
+
+Save all generated queries to:
+```
+validation/<table_name>_<YYYYMMDD_HHMM>.sql
+```
+
+Include a header at the top of the file:
+```sql
+/*
+Validation queries for: <fully_qualified_table>
+Change type: <change type from Step 1>
+Generated: <timestamp>
+Workflow 4 risk tier: <tier from this session>
+
+Instructions:
+1. Replace <YOUR_DEV_DATABASE> with your personal or branch database
+2. Run the row count comparison first
+3. Run change-specific queries to validate intended behavior
+4. Unexpected results should be investigated before merging
+*/
+```
+
+Then tell the engineer:
+> "Validation queries saved to `validation/<table_name>_<timestamp>.sql`.
+> Replace `<YOUR_DEV_DATABASE>` with your dev database and run in Snowflake
+> or your preferred SQL client to verify the change behaved as expected."
+
+---
+
+**What this workflow does NOT do:**
+- Does not execute queries (Phase 2)
+- Does not require warehouse MCP connection
+- Does not generate Monte Carlo notebook YAML
+- Does not trigger automatically — only on explicit engineer request
+- Does not activate if Workflow 4 has not run for this table in this session
 
 ## Important parameter notes
 

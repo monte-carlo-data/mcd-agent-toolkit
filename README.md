@@ -4,17 +4,33 @@ Public Claude Code skills by [Monte Carlo Data](https://www.montecarlodata.com/)
 
 ## Installation
 
+**Option A — Install script:**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/monte-carlo-claude-plugin/main/install.sh)
+```
+
+**Option B — via [skills.sh](https://skills.sh) CLI:**
+
+```bash
+npx skilladd monte-carlo-data/mcd-skills
+```
+
+**Option C — via Claude Code plugin marketplace:**
+
 ```
 /plugin marketplace add monte-carlo-data/mcd-skills
 /plugin install monte-carlo@mcd-skills
 ```
+
+> **Note:** The `safe-change` skill requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server) to be configured. See [setup instructions](safe-change/README.md#setup) before use.
 
 ## Available Skills
 
 ### safe-change
 Automatically activates when a dbt model, SQL file, or table is referenced. Surfaces Monte Carlo context — table health, active alerts, lineage, blast radius — before any code is written, and uses those findings to shape code recommendations.
 
-See [Introduction](plugins/monte-carlo/skills/safe-change/README.md), [Installation](plugins/monte-carlo/skills/safe-change/README.md#setup) and [Usage](plugins/monte-carlo/skills/safe-change/README.md#how-to-use-it). Requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server).
+See [Introduction](safe-change/README.md), [Installation](safe-change/README.md#setup) and [Usage](safe-change/README.md#how-to-use-it). Requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server).
 
 ### generate-validation-notebook
 
