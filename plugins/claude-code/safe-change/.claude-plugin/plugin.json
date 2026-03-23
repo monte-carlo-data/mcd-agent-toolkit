@@ -16,7 +16,7 @@
         "schema"
     ],
     "skills": "./skills/",
-    "hooks": "hooks/hooks.json",
+    "hooks": "./hooks/hooks.json",
     "mcpServers": {
         "monte-carlo": {
             "command": "npx",
@@ -31,10 +31,5 @@
             ]
         }
     },
-    "commands": {
-        "mc-validate": {
-            "description": "Generate and run validation queries for the current change",
-            "command": "python3 hooks/validate_command.py"
-        }
-    }
+    "commands": ["./commands/mc-validate.md"]
 }
