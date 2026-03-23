@@ -1,14 +1,19 @@
 {
-  "name": "mc-safe-change",
-  "version": "1.0.0",
-  "description": "Monte Carlo Safe Change — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
-  "author": {
-    "name": "Monte Carlo",
-    "url": "https://www.montecarlodata.com"
-  },
-  "repository": "https://github.com/monte-carlo-data/mcd-agent-toolkit",
-  "license": "MIT",
-  "keywords": ["monte-carlo", "data-observability", "safe-change", "dbt", "schema"],
-  "skills": "./skills/",
-  "hooks": "./hooks/"
+    "name": "mc-safe-change",
+    "version": "1.0.0",
+    "description": "Monte Carlo Safe Change — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
+    "author": {
+        "name": "Monte Carlo",
+        "url": "https://www.montecarlodata.com"
+    },
+    "repository": "https://github.com/monte-carlo-data/mcd-agent-toolkit",
+    "license": "MIT",
+    "keywords": [
+        "monte-carlo",
+        "data-observability",
+        "safe-change",
+        "dbt",
+        "schema"
+    ],
+    "skills": "./skills/"
 }
