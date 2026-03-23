@@ -30,7 +30,8 @@ mcd-agent-toolkit/
 │           ├── .claude-plugin/plugin.json
 │           └── skills/generate-validation-notebook → symlink
 │
-├── marketplace.json
+├── .claude-plugin/
+│   └── marketplace.json
 ├── README.md
 ├── LICENSE
 └── SECURITY.md
@@ -55,7 +56,7 @@ Plugins reference skills via symlinks so that skills are authored once and share
    ln -s ../../../../skills/<skill-name> <skill-name>
    ```
 4. If the plugin needs hooks, create a `hooks/` directory at the plugin root and add hook files there.
-5. Add the plugin to `marketplace.json` at the repo root.
+5. Add the plugin to `.claude-plugin/marketplace.json`.
 6. Test locally with `claude --plugin-dir ./plugins/claude-code/<skill-name>`.
 
 ## Updating an existing skill
