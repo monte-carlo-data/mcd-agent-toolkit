@@ -1,19 +1,86 @@
-# Monte Carlo Claude Plugin
+# mcd-agent-toolkit
 
-Installs [Monte Carlo's Claude Code skills](https://github.com/monte-carlo-data/mcd-skills) into your editor.
+Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins that integrate Monte Carlo's data observability platform — lineage, monitoring, validation and alerting — into your development workflow.
 
-## Installation
+## Prerequisites
 
-Skills installed via Claude Code plugin marketplace are namespaced (invoked as `/monte-carlo:<skill-name>`).
+- An [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
+- [Monte Carlo MCP server](https://docs.getmontecarlo.com/docs/mcp-server) configured (required by the `safe-change` plugin/skill)
+      <details>
+      <summary>Click to expand - Configure Monte Carlo MCP Server</summary>
+      
+      1. Obtain an MCP server key:
+         — Go to Monte Carlo → Settings → API Keys, click Add.
+         - Select type MCP Server. Copy the `KEY_ID` and `KEY_SECRET`.
+      
+      2. Configure the MCP server 
+         — Run `cp .mcp.json.example <mcp-config-path>/.mcp.json` to either:
+            - Project-level: `.mcp.json` at your project root (recommended — keeps config scoped to the project)
+            - Global: `~/.claude/claude.json` (path depends on your coding agent; applies to all projects)
+         - Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values.
+  
+      3. Verify — In Claude Code, ask: "Test my Monte Carlo connection". Claude will call `testConnection` and confirm
+         your credentials are working.
+      </details>
 
+
+## Installing plugins (recommended)
+
+**Monte Carlo recommends installing skills via their corresponding plugins.** Plugins bundle the skill together with hooks, configuration and additional capabilities that provide a richer experience (e.g., automatic context enrichment from MC lineage data, executing validation queries and synthesizing results in your coding sessions).
+
+### Claude Code
+
+1. Add the marketplace:
+   ```
+   /plugin marketplace add monte-carlo-data/mcd-agent-toolkit
+   ```
+2. Install a plugin:
+   ```
+   /plugin install mc-safe-change@mcd-agent-toolkit
+   /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
+   ```
+3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
+
+## Available plugins
+
+| Plugin | Description |
+|---|---|
+| `mc-safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries for safe deployments. |
+| `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
+
+## Using skills directly (advanced)
+
+Skills can also be used standalone without the plugin wrapper. This section is for users who want to submit skills to registries or use them with non-Claude-Code agents. Monte Carlo recommends the plugin approach above for the best experience.
+
+### skills.sh (Vercel CLI)
+
+```bash
+npx skills add monte-carlo-data/mcd-agent-toolkit --skill safe-change
 ```
-/plugin marketplace add monte-carlo-data/monte-carlo-claude-plugin
-/plugin install monte-carlo@monte-carlo-data-monte-carlo-claude-plugin
+
+### Manual installation
+
+Copy to `~/.claude/skills/` or `.agents/skills/`:
+
+```bash
+cp -r skills/safe-change ~/.claude/skills/safe-change
 ```
 
-> **Note:** The `safe-change` skill requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server) to be configured. See [setup instructions](https://github.com/monte-carlo-data/mcd-skills/blob/main/safe-change/README.md#setup).
+## Available skills
 
-## Skills installed
+| Skill | Description |
+|---|---|
+| `safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries for safe deployments. |
+| `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 
-- **[safe-change](https://github.com/monte-carlo-data/mcd-skills/tree/main/safe-change)** — Surfaces table health, alerts, lineage, and blast radius before SQL edits; generates monitors-as-code. Requires Monte Carlo MCP Server.
-- **[generate-validation-notebook](https://github.com/monte-carlo-data/mcd-skills/tree/main/generate-validation-notebook)** — Generates SQL validation notebooks for dbt PR changes.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests.
+
+## License
+
+This project is licensed under the Apache-2.0 license — see [LICENSE](LICENSE) for details.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.

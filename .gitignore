@@ -5,9 +5,6 @@ node_modules/
 .DS_Store
 .venv/
 target/
-# CLAUDE.md is intentionally committed at repo root
-**/CLAUDE.md
-!CLAUDE.md
+CLAUDE.md
 .claude/
-
-temp/*
+temp/

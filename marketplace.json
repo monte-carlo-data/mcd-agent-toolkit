@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mcd-agent-toolkit",
+  "owner": {
+    "name": "Monte Carlo",
+    "email": "support@montecarlodata.com"
+  },
+  "plugins": [
+    {
+      "name": "mc-safe-change",
+      "source": "./plugins/claude-code/safe-change",
+      "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
+    },
+    {
+      "name": "mc-generate-validation-notebook",
+      "source": "./plugins/claude-code/generate-validation-notebook",
+      "description": "Generate Monte Carlo validation notebooks."
+    }
+  ]
+}
