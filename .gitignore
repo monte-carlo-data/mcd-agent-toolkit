@@ -9,5 +9,4 @@ target/
 **/CLAUDE.md
 !CLAUDE.md
 .claude/
-
-temp/*
+temp/

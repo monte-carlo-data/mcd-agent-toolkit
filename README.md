@@ -1,19 +1,105 @@
-# Monte Carlo Claude Plugin
+# mcd-agent-toolkit
 
-Installs [Monte Carlo's Claude Code skills](https://github.com/monte-carlo-data/mcd-skills) into your editor.
+Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins that integrate Monte Carlo's data observability platform — lineage, monitoring, and alerting — into your development workflow.
 
-## Installation
+## Prerequisites
 
-Skills installed via Claude Code plugin marketplace are namespaced (invoked as `/monte-carlo:<skill-name>`).
+- A [Monte Carlo](https://www.montecarlodata.com) account with API access
+- Set environment variables:
+  - `MC_API_KEY` — your Monte Carlo API key
+  - `MC_API_URL` — your Monte Carlo API URL
+
+## Installing plugins (recommended)
+
+**Monte Carlo recommends installing skills via their corresponding plugins.** Plugins bundle the skill together with hooks and configuration that provide a richer experience (e.g., automatic context enrichment from MC lineage data).
+
+### Claude Code
+
+1. Add the marketplace:
+   ```
+   /plugin marketplace add monte-carlo-data/mcd-agent-toolkit
+   ```
+2. Install a plugin:
+   ```
+   /plugin install mc-safe-change@monte-carlo-mcd
+   /plugin install mc-generate-validation-notebook@monte-carlo-mcd
+   ```
+3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
+
+## Available plugins
+
+| Plugin | Description |
+|---|---|
+| `mc-safe-change` | Detects and prevents breaking schema changes using Monte Carlo lineage and monitoring data. Includes a context hook that automatically enriches your session with MC metadata. |
+| `mc-generate-validation-notebook` | Generates Monte Carlo validation notebooks for data pipeline testing. |
+
+## Using skills directly (advanced)
+
+Skills can also be used standalone without the plugin wrapper. This section is for users who want to submit skills to registries or use them with non-Claude-Code agents. Monte Carlo recommends the plugin approach above for the best experience.
+
+### skills.sh (Vercel CLI)
+
+```bash
+npx skills add monte-carlo-data/mcd-agent-toolkit --skill safe-change
+```
+
+### Manual installation
+
+Copy to `~/.claude/skills/` or `.agents/skills/`:
+
+```bash
+cp -r skills/safe-change ~/.claude/skills/safe-change
+```
+
+## Available skills
+
+| Skill | Description |
+|---|---|
+| `safe-change` | Detect and prevent breaking schema changes using MC lineage and monitoring. |
+| `generate-validation-notebook` | Generate validation notebooks for data pipeline testing. |
+
+## Repository structure
 
 ```
-/plugin marketplace add monte-carlo-data/monte-carlo-claude-plugin
-/plugin install monte-carlo@monte-carlo-data-monte-carlo-claude-plugin
+mcd-agent-toolkit/
+├── skills/                                        ← source of truth for all MC skills, registry-submittable
+│   ├── safe-change/
+│   │   ├── SKILL.md
+│   │   ├── README.md
+│   │   └── references/
+│   │       └── TROUBLESHOOTING.md
+│   └── generate-validation-notebook/
+│       ├── SKILL.md
+│       └── scripts/
+│           ├── generate_notebook_url.py
+│           └── resolve_dbt_schema.py
+│
+├── plugins/
+│   └── claude-code/                               ← Claude Code plugin wrappers
+│       ├── safe-change/                           ← self-contained plugin with hooks
+│       │   ├── .claude-plugin/plugin.json
+│       │   ├── skills/safe-change → symlink       ← points to ../../../../skills/safe-change
+│       │   └── hooks/mc_context_hook.py
+│       └── generate-validation-notebook/          ← thin plugin (no hooks)
+│           ├── .claude-plugin/plugin.json
+│           └── skills/generate-validation-notebook → symlink
+│
+├── marketplace.json                               ← Claude Code marketplace manifest
+├── README.md
+├── LICENSE
+└── SECURITY.md
 ```
 
-> **Note:** The `safe-change` skill requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server) to be configured. See [setup instructions](https://github.com/monte-carlo-data/mcd-skills/blob/main/safe-change/README.md#setup).
+Plugins reference skills via symlinks so that skills are authored once and shared across all plugin wrappers. When a user installs a plugin, Claude Code resolves the symlinks and copies the real files into its plugin cache.
 
-## Skills installed
+## Contributing
 
-- **[safe-change](https://github.com/monte-carlo-data/mcd-skills/tree/main/safe-change)** — Surfaces table health, alerts, lineage, and blast radius before SQL edits; generates monitors-as-code. Requires Monte Carlo MCP Server.
-- **[generate-validation-notebook](https://github.com/monte-carlo-data/mcd-skills/tree/main/generate-validation-notebook)** — Generates SQL validation notebooks for dbt PR changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
