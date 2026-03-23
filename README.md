@@ -4,10 +4,23 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
 ## Prerequisites
 
-- A [Monte Carlo](https://www.montecarlodata.com) account with API access
-- Set environment variables:
-  - `MC_API_KEY` — your Monte Carlo API key
-  - `MC_API_URL` — your Monte Carlo API URL
+- A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
+- The **Monte Carlo MCP server** configured (required by the `safe-change` plugin/skill)
+
+### Setting up the MCP server
+
+1. **Obtain an MCP server key** — Go to **Monte Carlo → Settings → API Keys**, click **Add**, and select type **MCP Server**. Copy the `KEY_ID` and `KEY_SECRET`.
+
+   > MCP keys are separate from standard API keys. Standard keys work for the CLI; MCP keys work for the editor integration.
+
+2. **Configure the MCP server** — run `cp .mcp.json.example <mcp-configuration-path>/.mcp.json` to either:
+   - **Project-level:** `.mcp.json` at your project root (recommended — keeps config scoped to the project)
+   - **Global:** `~/.claude/claude.json` (applies to all projects)
+
+
+   Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values.
+
+3. **Verify** — In Claude Code, ask: *"Test my Monte Carlo connection"*. Claude will call `testConnection` and confirm your credentials are working.
 
 ## Installing plugins (recommended)
 
@@ -59,10 +72,11 @@ cp -r skills/safe-change ~/.claude/skills/safe-change
 | `generate-validation-notebook` | Generate validation notebooks for data pipeline testing. |
 
 ## Repository structure
-
+<details>
+<summary>Click to expand</summary>
 ```
 mcd-agent-toolkit/
-├── skills/                                        ← source of truth for all MC skills, registry-submittable
+├── skills/
 │   ├── safe-change/
 │   │   ├── SKILL.md
 │   │   ├── README.md
@@ -75,22 +89,23 @@ mcd-agent-toolkit/
 │           └── resolve_dbt_schema.py
 │
 ├── plugins/
-│   └── claude-code/                               ← Claude Code plugin wrappers
-│       ├── safe-change/                           ← self-contained plugin with hooks
+│   └── claude-code/
+│       ├── safe-change/
 │       │   ├── .claude-plugin/plugin.json
-│       │   ├── skills/safe-change → symlink       ← points to ../../../../skills/safe-change
+│       │   ├── skills/safe-change → symlink
 │       │   └── hooks/mc_context_hook.py
-│       └── generate-validation-notebook/          ← thin plugin (no hooks)
+│       └── generate-validation-notebook/
 │           ├── .claude-plugin/plugin.json
 │           └── skills/generate-validation-notebook → symlink
 │
-├── marketplace.json                               ← Claude Code marketplace manifest
+├── marketplace.json
 ├── README.md
 ├── LICENSE
 └── SECURITY.md
 ```
+</details>
 
-Plugins reference skills via symlinks so that skills are authored once and shared across all plugin wrappers. When a user installs a plugin, Claude Code resolves the symlinks and copies the real files into its plugin cache.
+Plugins reference skills via symlinks so that skills are authored once and shared across the corresponding plugins. When a user installs a plugin, Claude Code resolves the symlinks and copies the real files into its plugin cache.
 
 ## Contributing
 
@@ -98,7 +113,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+This project is licensed under the Apache-2.0 license — see [LICENSE](LICENSE) for details.
 
 ## Security
 
