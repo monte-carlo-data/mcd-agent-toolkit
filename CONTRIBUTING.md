@@ -4,6 +4,40 @@ Welcome! We appreciate contributions from both Monte Carlo engineers and the com
 
 **Repo layout:** `skills/` is the single source of truth for skill content. `plugins/claude-code/` contains editor-specific plugin wrappers that reference skills via symlinks.
 
+## Repository structure
+
+```
+mcd-agent-toolkit/
+├── skills/
+│   ├── safe-change/
+│   │   ├── SKILL.md
+│   │   ├── README.md
+│   │   └── references/
+│   │       └── TROUBLESHOOTING.md
+│   └── generate-validation-notebook/
+│       ├── SKILL.md
+│       └── scripts/
+│           ├── generate_notebook_url.py
+│           └── resolve_dbt_schema.py
+│
+├── plugins/
+│   └── claude-code/
+│       ├── safe-change/
+│       │   ├── .claude-plugin/plugin.json
+│       │   ├── skills/safe-change → symlink
+│       │   └── hooks/mc_context_hook.py
+│       └── generate-validation-notebook/
+│           ├── .claude-plugin/plugin.json
+│           └── skills/generate-validation-notebook → symlink
+│
+├── marketplace.json
+├── README.md
+├── LICENSE
+└── SECURITY.md
+```
+
+Plugins reference skills via symlinks so that skills are authored once and shared across the corresponding plugins. When a user installs a plugin, Claude Code resolves the symlinks and copies the real files into its plugin cache.
+
 ## Adding a new skill
 
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).

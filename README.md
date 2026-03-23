@@ -73,42 +73,6 @@ cp -r skills/safe-change ~/.claude/skills/safe-change
 | `safe-change` | Detect and prevent breaking schema changes using MC lineage and monitoring. |
 | `generate-validation-notebook` | Generate validation notebooks for data pipeline testing. |
 
-## Repository structure
-<details>
-<summary>Click to expand</summary>
-```
-mcd-agent-toolkit/
-├── skills/
-│   ├── safe-change/
-│   │   ├── SKILL.md
-│   │   ├── README.md
-│   │   └── references/
-│   │       └── TROUBLESHOOTING.md
-│   └── generate-validation-notebook/
-│       ├── SKILL.md
-│       └── scripts/
-│           ├── generate_notebook_url.py
-│           └── resolve_dbt_schema.py
-│
-├── plugins/
-│   └── claude-code/
-│       ├── safe-change/
-│       │   ├── .claude-plugin/plugin.json
-│       │   ├── skills/safe-change → symlink
-│       │   └── hooks/mc_context_hook.py
-│       └── generate-validation-notebook/
-│           ├── .claude-plugin/plugin.json
-│           └── skills/generate-validation-notebook → symlink
-│
-├── marketplace.json
-├── README.md
-├── LICENSE
-└── SECURITY.md
-```
-</details>
-
-Plugins reference skills via symlinks so that skills are authored once and shared across the corresponding plugins. When a user installs a plugin, Claude Code resolves the symlinks and copies the real files into its plugin cache.
-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests.
