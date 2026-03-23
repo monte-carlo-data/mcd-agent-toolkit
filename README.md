@@ -36,8 +36,8 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
 2. Install a plugin:
    ```
-   /plugin install mc-safe-change@monte-carlo-mcd
-   /plugin install mc-generate-validation-notebook@monte-carlo-mcd
+   /plugin install mc-safe-change@mcd-agent-toolkit
+   /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
    ```
 3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
 
