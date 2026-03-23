@@ -1,11 +1,11 @@
 # mcd-agent-toolkit
 
-Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins that integrate Monte Carlo's data observability platform — lineage, monitoring, and alerting — into your development workflow.
+Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins that integrate Monte Carlo's data observability platform — lineage, monitoring, validation and alerting — into your development workflow.
 
 ## Prerequisites
 
-- A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
-- The [Monte Carlo MCP server](https://docs.getmontecarlo.com/docs/mcp-server) configured (required by the `safe-change` plugin/skill)
+- An [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
+- [Monte Carlo MCP server](https://docs.getmontecarlo.com/docs/mcp-server) configured (required by the `safe-change` plugin/skill)
       <details>
       <summary>Click to expand - Configure Monte Carlo MCP Server</summary>
       
@@ -26,7 +26,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
 ## Installing plugins (recommended)
 
-**Monte Carlo recommends installing skills via their corresponding plugins.** Plugins bundle the skill together with hooks and configuration that provide a richer experience (e.g., automatic context enrichment from MC lineage data).
+**Monte Carlo recommends installing skills via their corresponding plugins.** Plugins bundle the skill together with hooks, configuration and additional capabilities that provide a richer experience (e.g., automatic context enrichment from MC lineage data, executing validation queries and synthesizing results in your coding sessions).
 
 ### Claude Code
 
