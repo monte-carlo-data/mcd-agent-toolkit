@@ -28,8 +28,9 @@ def main():
     if not tables:
         return
 
-    # Only prompt if Workflow 4 ran and verified for at least one edited table
-    w4_tables = [t for t in tables if get_workflow4_state(t) == "verified"]
+    # Prompt if Workflow 4 was triggered for at least one edited table
+    # "injected" means W4 instruction was sent; "verified" means completion confirmed
+    w4_tables = [t for t in tables if get_workflow4_state(t) in ("injected", "verified")]
     if not w4_tables:
         return
 

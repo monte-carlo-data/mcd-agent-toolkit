@@ -16,7 +16,6 @@
         "schema"
     ],
     "skills": "./skills/",
-    "hooks": "./hooks/hooks.json",
     "mcpServers": {
         "monte-carlo": {
             "command": "npx",
