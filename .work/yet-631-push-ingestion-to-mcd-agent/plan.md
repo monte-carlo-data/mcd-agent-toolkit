@@ -2,7 +2,8 @@
 skill: start-work
 ticket: YET-631
 branch: fbenitez/yet-631-push-ingestion-to-mcd-agent
-status: planning
+status: pr-open
+pr: https://github.com/monte-carlo-data/mcd-agent-toolkit/pull/7
 ---
 
 # Plan: Ship Pandora Push Model — Migrate plugin+skills to mcd-agent-toolkit
