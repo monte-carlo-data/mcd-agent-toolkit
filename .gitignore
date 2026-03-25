@@ -9,4 +9,3 @@ target/
 temp/
 __pycache__/
 *.pyc
-docs/
