@@ -5,20 +5,22 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 ## Prerequisites
 
 - An [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
-- [Monte Carlo MCP server](https://docs.getmontecarlo.com/docs/mcp-server) configured (required by the `safe-change` plugin/skill)
+- Monte Carlo MCP server — bundled with the `mc-safe-change` plugin (authenticates via OAuth). After installing the plugin, run `/mcp` in Claude Code to authenticate.
       <details>
-      <summary>Click to expand - Configure Monte Carlo MCP Server</summary>
-      
+      <summary>Click to expand - Manual MCP setup (without plugin)</summary>
+
+      If you're using the skill directly without the plugin, configure the MCP server manually:
+
       1. Obtain an MCP server key:
          — Go to Monte Carlo → Settings → API Keys, click Add.
          - Select type MCP Server. Copy the `KEY_ID` and `KEY_SECRET`.
-      
-      2. Configure the MCP server 
+
+      2. Configure the MCP server
          — Run `cp .mcp.json.example <mcp-config-path>/.mcp.json` to either:
             - Project-level: `.mcp.json` at your project root (recommended — keeps config scoped to the project)
             - Global: `~/.claude/claude.json` (path depends on your coding agent; applies to all projects)
          - Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values.
-  
+
       3. Verify — In Claude Code, ask: "Test my Monte Carlo connection". Claude will call `testConnection` and confirm
          your credentials are working.
       </details>

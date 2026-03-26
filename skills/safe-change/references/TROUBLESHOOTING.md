@@ -5,7 +5,10 @@
 # Verify the server is reachable
 curl -s -o /dev/null -w "%{http_code}" https://integrations.getmontecarlo.com/mcp/
 ```
-Check that `x-mcd-id` and `x-mcd-token` are set correctly in your MCP config. The key format is `<KEY_ID>:<KEY_SECRET>` — these are split across two separate headers.
+
+**If using the plugin (OAuth):** Run `/mcp` in Claude Code, select the `monte-carlo` server, and re-authenticate. If the browser flow doesn't complete, copy the callback URL from your browser's address bar into the URL prompt that appears in Claude Code.
+
+**If using manual setup (header-based auth):** Check that `x-mcd-id` and `x-mcd-token` are set correctly in your MCP config. The key format is `<KEY_ID>:<KEY_SECRET>` — these are split across two separate headers.
 
 
 ### Monitor creation errors:

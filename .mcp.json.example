@@ -1,4 +1,5 @@
 {
+  "_comment": "Manual setup only. If you installed the mc-safe-change plugin, the MCP server is bundled automatically — no need to copy this file.",
   "mcpServers": {
     "monte-carlo": {
       "command": "npx",

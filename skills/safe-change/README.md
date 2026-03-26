@@ -33,46 +33,23 @@ Core workflows — table health check, change impact assessment, alert triage, a
 
 ## Setup
 
-### Step 1 — Install the skill
+### Step 1 — Install the plugin
 
 See [installation options](https://github.com/monte-carlo-data/mcd-skills#installation) in the main repository README.
 
-### Step 2 — Obtain an MCP server key
+The Monte Carlo MCP server is bundled with the plugin and starts automatically when the plugin is enabled. Tool permissions are also pre-configured — no manual setup needed.
 
-1. Go to **Monte Carlo → Settings → API Keys**
-2. Click **Add** and select type **MCP Server**
-3. Copy the key — it has two parts: `KEY_ID` and `KEY_SECRET`
+### Step 2 — Authenticate with Monte Carlo
 
-MCP keys are separate from standard API keys. Standard keys work for the CLI; MCP keys work for the editor integration.
+In Claude Code, run:
 
-### Step 3 — Configure your MCP server
-
-Add the Monte Carlo MCP server to your project `.mcp.json` or global `~/.claude/claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "monte-carlo": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://integrations.getmontecarlo.com/mcp/",
-        "--header",
-        "x-mcd-id: <KEY_ID>",
-        "--header",
-        "x-mcd-token: <KEY_SECRET>",
-        "--header",
-        "x-mcd-source: editor-skill-1.0"
-      ]
-    }
-  }
-}
+```
+/mcp
 ```
 
-Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values. See `.mcp.json.example` for a copy-paste template.
+Select the `monte-carlo` server and follow the browser-based OAuth flow to log in with your Monte Carlo account.
 
-### Step 4 — Verify the connection
+### Step 3 — Verify the connection
 
 In Claude Code, paste:
 
@@ -80,31 +57,12 @@ In Claude Code, paste:
 
 Claude will call `testConnection` and confirm your credentials are working.
 
-### Step 5 — Configure tool permissions (recommended)
+<details>
+<summary>Manual setup (without plugin)</summary>
 
-By default Claude Code will prompt for permission on each Monte Carlo
-MCP tool call. To allow the skill to run without interruption, choose
-one of the following:
+If you're not using the plugin, you can configure the MCP server manually. See `.mcp.json.example` for a template that uses `npx mcp-remote` with header-based authentication.
 
-**Option A — Add to allow list (recommended)**
-Add the following to `.claude/settings.local.json` in your project:
-```json
-{
-  "allowedTools": [
-    "mcp__monte-carlo__*"
-  ]
-}
-```
-
-This allows all Monte Carlo read operations without prompting, while
-keeping write operations (file edits, CLI commands) under your control.
-
-**Option B — Skip all permissions (use with caution)**
-```bash
-claude --dangerously-skip-permissions
-```
-This bypasses all permission checks including file edits and CLI
-commands. Only use this in a safe, non-production environment.
+</details>
 
 ## How to use it
 
