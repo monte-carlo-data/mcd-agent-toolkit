@@ -10,9 +10,12 @@ Impact check gate uses three states:
 import hashlib
 import json
 import os
+import re
 import time
 
 CACHE_DIR = "/tmp"
+_FILE_PERMISSIONS = 0o600  # Owner read/write only
+_SESSION_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 IC_PREFIX = "mc_safe_change_ic_"
 MG_PREFIX = "mc_safe_change_mg_"
 TURN_PREFIX = "mc_safe_change_turn_"
@@ -33,16 +36,41 @@ DBT_DEFAULT_PATHS = {
 }
 
 
+def _write_secure(path: str, content: str) -> None:
+    """Write content to path and restrict permissions to owner-only."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, _FILE_PERMISSIONS)
+    try:
+        os.write(fd, content.encode())
+    finally:
+        os.close(fd)
+
+
+def _append_secure(path: str, content: str) -> None:
+    """Append content to path, creating with restricted permissions if needed."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, _FILE_PERMISSIONS)
+    try:
+        os.write(fd, content.encode())
+    finally:
+        os.close(fd)
+
+
+def _validate_session_id(session_id: str) -> str:
+    """Validate session_id is alphanumeric with dashes/underscores only."""
+    if not _SESSION_ID_RE.match(session_id):
+        raise ValueError(f"Invalid session_id: {session_id!r}")
+    return session_id
+
+
 def _w4_path(table_name: str) -> str:
     return os.path.join(CACHE_DIR, f"{IC_PREFIX}{table_name}")
 
 
 def _turn_path(session_id: str) -> str:
-    return os.path.join(CACHE_DIR, f"{TURN_PREFIX}{session_id}")
+    return os.path.join(CACHE_DIR, f"{TURN_PREFIX}{_validate_session_id(session_id)}")
 
 
 def _pending_path(session_id: str) -> str:
-    return os.path.join(CACHE_DIR, f"{PENDING_PREFIX}{session_id}")
+    return os.path.join(CACHE_DIR, f"{PENDING_PREFIX}{_validate_session_id(session_id)}")
 
 
 # --- Impact check three-state marker ---
@@ -62,8 +90,7 @@ def get_impact_check_state(table_name: str) -> str | None:
 
 def mark_impact_check_injected(table_name: str) -> None:
     path = _w4_path(table_name)
-    with open(path, "w") as f:
-        json.dump({"state": "injected", "timestamp": time.time()}, f)
+    _write_secure(path, json.dumps({"state": "injected", "timestamp": time.time()}))
 
 
 def mark_impact_check_verified(table_name: str) -> None:
@@ -76,8 +103,7 @@ def mark_impact_check_verified(table_name: str) -> None:
             timestamp = data.get("timestamp", timestamp)
     except (json.JSONDecodeError, OSError):
         pass
-    with open(path, "w") as f:
-        json.dump({"state": "verified", "timestamp": timestamp}, f)
+    _write_secure(path, json.dumps({"state": "verified", "timestamp": timestamp}))
 
 
 def get_impact_check_age_seconds(table_name: str) -> float:
@@ -101,8 +127,7 @@ def has_monitor_gap(table_name: str) -> bool:
 
 
 def mark_monitor_gap(table_name: str) -> None:
-    with open(_mg_path(table_name), "w") as f:
-        f.write(str(time.time()))
+    _write_secure(_mg_path(table_name), str(time.time()))
 
 
 # --- Turn-level edit accumulator ---
@@ -124,8 +149,7 @@ def add_edited_table(session_id: str, table_name: str) -> None:
     if table_name in existing:
         return
     path = _turn_path(session_id)
-    with open(path, "a") as f:
-        f.write(table_name + "\n")
+    _append_secure(path, table_name + "\n")
 
 
 def clear_edited_tables(session_id: str) -> None:
@@ -142,9 +166,7 @@ def move_to_pending_validation(session_id: str) -> None:
         existing = get_pending_validation_tables(session_id)
         merged = list(dict.fromkeys(existing + tables))  # deduplicate, preserve order
         path = _pending_path(session_id)
-        with open(path, "w") as f:
-            for t in merged:
-                f.write(t + "\n")
+        _write_secure(path, "".join(t + "\n" for t in merged))
     clear_edited_tables(session_id)
 
 
@@ -271,8 +293,7 @@ def get_dbt_paths(file_path: str) -> dict:
     paths.update(parsed)
 
     try:
-        with open(cache_path, "w") as f:
-            json.dump({"mtime": mtime, "paths": paths}, f)
+        _write_secure(cache_path, json.dumps({"mtime": mtime, "paths": paths}))
     except OSError:
         pass
 
@@ -301,8 +322,7 @@ def cleanup_stale_cache() -> None:
 
     # Touch marker first to prevent concurrent cleanup
     try:
-        with open(marker_path, "w") as f:
-            f.write(str(now))
+        _write_secure(marker_path, str(now))
     except OSError:
         return
 

@@ -1,9 +1,15 @@
 import os
+import stat
 import time
 import json
 import pytest
 
 from lib.cache import (
+    CACHE_DIR,
+    IC_PREFIX,
+    TURN_PREFIX,
+    PENDING_PREFIX,
+    _validate_session_id,
     get_impact_check_state,
     mark_impact_check_injected,
     mark_impact_check_verified,
@@ -93,3 +99,49 @@ class TestPendingValidation:
 
     def test_no_pending_returns_empty(self):
         assert get_pending_validation_tables("session_1") == []
+
+
+class TestSessionIdValidation:
+    def test_valid_alphanumeric(self):
+        assert _validate_session_id("abc123") == "abc123"
+
+    def test_valid_with_dashes_underscores(self):
+        assert _validate_session_id("session-1_test") == "session-1_test"
+
+    def test_rejects_path_traversal(self):
+        with pytest.raises(ValueError):
+            _validate_session_id("../../etc/passwd")
+
+    def test_rejects_spaces(self):
+        with pytest.raises(ValueError):
+            _validate_session_id("session 1")
+
+    def test_rejects_shell_metacharacters(self):
+        for bad in ["$(cmd)", "a;b", "a&b", "a|b", "a\nb"]:
+            with pytest.raises(ValueError):
+                _validate_session_id(bad)
+
+    def test_rejects_empty(self):
+        with pytest.raises(ValueError):
+            _validate_session_id("")
+
+
+class TestFilePermissions:
+    def _get_perms(self, path):
+        return stat.S_IMODE(os.stat(path).st_mode)
+
+    def test_impact_check_file_is_owner_only(self):
+        mark_impact_check_injected("perm_test_table")
+        path = os.path.join(CACHE_DIR, f"{IC_PREFIX}perm_test_table")
+        assert self._get_perms(path) == 0o600
+
+    def test_turn_file_is_owner_only(self):
+        add_edited_table("perm_test_session", "orders")
+        path = os.path.join(CACHE_DIR, f"{TURN_PREFIX}perm_test_session")
+        assert self._get_perms(path) == 0o600
+
+    def test_pending_file_is_owner_only(self):
+        add_edited_table("perm_test_session2", "orders")
+        move_to_pending_validation("perm_test_session2")
+        path = os.path.join(CACHE_DIR, f"{PENDING_PREFIX}perm_test_session2")
+        assert self._get_perms(path) == 0o600
