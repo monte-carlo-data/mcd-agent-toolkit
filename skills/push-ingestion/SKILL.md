@@ -29,6 +29,115 @@ Push data travels through the integration gateway → dedicated Kinesis streams 
 adapter/normalizer code → the same downstream systems that power the pull model. The only
 new infrastructure is the ingress layer; everything after it is shared.
 
+## MANDATORY — Always start from templates
+
+When generating any push-ingestion script, you MUST:
+
+1. **Read the corresponding template** from `scripts/templates/<warehouse>/` before writing any code.
+2. **Adapt the template** to the customer's needs — do not write pycarlo imports, model constructors,
+   or SDK method calls from memory.
+3. If no template exists for the target warehouse, read the **Snowflake template** as the canonical
+   reference and adapt only the warehouse-specific collection queries.
+
+Template files follow this naming pattern:
+- `collect_<flow>.py` — collection only (queries the warehouse, writes a JSON manifest)
+- `push_<flow>.py` — push only (reads the manifest, sends to Monte Carlo)
+- `collect_and_push_<flow>.py` — combined (imports from both, runs in sequence)
+
+**After running any push script**, you MUST surface the `invocation_id`(s) returned by the API
+to the user. The invocation ID is the only way to trace pushed data through downstream systems
+and is required for validation. Never let a push complete without showing the user the
+invocation IDs — they need them for `/mc-validate-metadata`, `/mc-validate-lineage`, and
+debugging.
+
+## Canonical pycarlo API — authoritative reference
+
+The following imports, classes, and method signatures are the **ONLY** correct pycarlo API for
+push ingestion. If your training data suggests different names, **it is wrong**. Use exactly
+what is listed here.
+
+### Imports and client setup
+
+```python
+from pycarlo.core import Client, Session
+from pycarlo.features.ingestion import IngestionService
+from pycarlo.features.ingestion.models import (
+    # Metadata
+    RelationalAsset, AssetMetadata, AssetField, AssetVolume, AssetFreshness, Tag,
+    # Lineage
+    LineageEvent, LineageAssetRef, ColumnLineageField, ColumnLineageSourceField, LineageEventType,
+    # Query logs
+    QueryLogEntry,
+)
+
+client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+service = IngestionService(mc_client=client)
+```
+
+### Method signatures
+
+```python
+# Metadata
+service.send_metadata(resource_uuid=..., resource_type=..., events=[RelationalAsset(...)])
+
+# Lineage (table or column)
+service.send_lineage(resource_uuid=..., resource_type=..., events=[LineageEvent(...)], event_type=...)
+
+# Query logs — note: log_type, NOT resource_type
+service.send_query_logs(resource_uuid=..., log_type=..., events=[QueryLogEntry(...)])
+
+# Extract invocation ID from any response
+IngestionService.extract_invocation_id(response)
+```
+
+### RelationalAsset structure (nested, NOT flat)
+
+```python
+RelationalAsset(
+    type="TABLE",  # or "VIEW"
+    metadata=AssetMetadata(
+        name="my_table",
+        database="analytics",
+        schema="public",
+        description="optional description",
+    ),
+    fields=[
+        AssetField(name="id", type="INTEGER", description=None),
+        AssetField(name="amount", type="DECIMAL(10,2)"),
+    ],
+    volume=AssetVolume(row_count=1000000, byte_count=111111111),  # optional
+    freshness=AssetFreshness(last_update_time="2026-03-12T14:30:00Z"),  # optional
+)
+```
+
+## NEVER use these — deprecated API names
+
+If you find yourself typing any name from the left column, **STOP** and use the right column.
+
+| Wrong (DO NOT USE) | Correct |
+|---|---|
+| `pycarlo.features.push_ingestion` | `pycarlo.features.ingestion` |
+| `PushIngestion` | `IngestionService` |
+| `ColumnMetadata` | `AssetField` |
+| `push_relational_assets()` | `send_metadata()` |
+| `push_lineage()` | `send_lineage()` |
+| `push_query_logs()` | `send_query_logs()` |
+| `Session(mcd_endpoint=...)` | `Session(mcd_id=..., mcd_token=..., scope="Ingestion")` |
+| Flat `RelationalAsset(database=..., schema=..., table_name=..., columns=...)` | Nested: `RelationalAsset(metadata=AssetMetadata(...), fields=[AssetField(...)], volume=..., freshness=...)` |
+
+## Environment variable conventions
+
+All generated scripts MUST use these exact variable names. Do NOT invent alternatives like
+`MCD_KEY_ID`, `MC_TOKEN`, `MONTE_CARLO_KEY`, etc.
+
+| Variable | Purpose | Used by |
+|---|---|---|
+| `MCD_INGEST_ID` | Ingestion key ID (scope=Ingestion) | push scripts |
+| `MCD_INGEST_TOKEN` | Ingestion key secret | push scripts |
+| `MCD_ID` | GraphQL API key ID | verification scripts |
+| `MCD_TOKEN` | GraphQL API key secret | verification scripts |
+| `MCD_RESOURCE_UUID` | Warehouse resource UUID | all scripts |
+
 ## What this skill can build for you
 
 Tell Claude your warehouse or data platform and Monte Carlo resource UUID and this skill will
@@ -93,8 +202,8 @@ Ask Claude to build the script for your warehouse:
 > "Build me a metadata collection script for Snowflake. My MC resource UUID is `abc-123`."
 
 The script templates in `scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
-are **examples** that illustrate the collection and push pattern — how to query system catalogs,
-build pycarlo objects, and call the push API. **They are not an exhaustive list.** If the
+are the **mandatory starting point** for script generation — they contain the correct pycarlo
+imports, model constructors, and SDK calls. **They are not an exhaustive list.** If the
 customer's warehouse is not listed, use the templates as a guide and determine the appropriate
 queries or file-collection approach for their platform. For file-based sources (like Hive
 Metastore logs), provide the command to retrieve the file, parse it, and transform it into the
@@ -207,3 +316,7 @@ When pushed data isn't appearing, work through these five checkpoints in order:
   Split large event lists into batches.
 - **Column lineage expires after 10 days**: unlike table metadata and table lineage (which
   never expire), column lineage has a 10-day TTL, same as pulled column lineage.
+- **Quote SQL identifiers in warehouse queries**: database, schema, and table names must be
+  double-quoted in SQL (e.g. `FROM "{db}".INFORMATION_SCHEMA.TABLES`). Mixed-case or
+  special-character names will break without quoting. The templates already do this correctly —
+  follow the same pattern for all warehouses.

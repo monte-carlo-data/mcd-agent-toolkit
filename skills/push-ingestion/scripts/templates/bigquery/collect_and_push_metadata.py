@@ -7,8 +7,8 @@ Imports ``collect()`` from ``collect_metadata`` and ``push()`` from
 Substitution points (search for "← SUBSTITUTE"):
   - BIGQUERY_PROJECT_ID   : GCP project ID to collect from
   - GOOGLE_APPLICATION_CREDENTIALS : path to service-account JSON key file
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
   - DATASET_EXCLUSIONS    : datasets to skip (informational / system datasets)
 
 Prerequisites:
@@ -27,9 +27,9 @@ from push_metadata import push, _BATCH_SIZE
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push BigQuery metadata to Monte Carlo")
     parser.add_argument("--project-id", default=os.getenv("BIGQUERY_PROJECT_ID"))  # ← SUBSTITUTE
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--output-file", default="metadata_output.json")
     parser.add_argument("--push-result-file", default="metadata_push_result.json")
     parser.add_argument(

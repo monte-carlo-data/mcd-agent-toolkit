@@ -9,9 +9,9 @@ Prerequisites:
     pip install requests
 
     Set environment variables:
-        MC_API_KEY_ID      — GraphQL API key ID   (from getmontecarlo.com/settings/api)
-        MC_API_KEY_TOKEN   — GraphQL API key secret
-        MC_RESOURCE_UUID   — Your MC warehouse/resource UUID
+        MCD_ID      — GraphQL API key ID   (from getmontecarlo.com/settings/api)
+        MCD_TOKEN   — GraphQL API key secret
+        MCD_RESOURCE_UUID   — Your MC warehouse/resource UUID
 
 Usage:
     python sample_verify.py \
@@ -298,9 +298,9 @@ def verify_query_logs(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Verify Monte Carlo push-ingested data via GraphQL")
-    parser.add_argument("--key-id",    default=os.environ.get("MC_API_KEY_ID"))
-    parser.add_argument("--key-token", default=os.environ.get("MC_API_KEY_TOKEN"))
-    parser.add_argument("--resource-uuid", default=os.environ.get("MC_RESOURCE_UUID"), required=False)
+    parser.add_argument("--key-id",    default=os.environ.get("MCD_ID"))
+    parser.add_argument("--key-token", default=os.environ.get("MCD_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.environ.get("MCD_RESOURCE_UUID"), required=False)
     parser.add_argument("--full-table-id", required=True, help="e.g. analytics:public.orders")
     parser.add_argument("--mcon", help="Use MCON directly instead of resolving from fullTableId")
     parser.add_argument("--check-schema",  action="store_true")
@@ -314,7 +314,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.key_id or not args.key_token:
-        print("ERROR: MC_API_KEY_ID and MC_API_KEY_TOKEN must be set", file=sys.stderr)
+        print("ERROR: MCD_ID and MCD_TOKEN must be set", file=sys.stderr)
         sys.exit(1)
 
     print(f"\n{'='*60}")

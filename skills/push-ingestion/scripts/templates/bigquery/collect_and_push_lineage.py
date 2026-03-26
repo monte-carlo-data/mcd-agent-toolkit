@@ -8,8 +8,8 @@ Substitution points (search for "← SUBSTITUTE"):
   - BIGQUERY_PROJECT_ID   : GCP project ID to collect from
   - BIGQUERY_REGION       : BigQuery region for INFORMATION_SCHEMA queries (e.g. "us", "eu")
   - LOOKBACK_HOURS        : how far back to scan job history (default 24 h)
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
 
 Prerequisites:
   pip install google-cloud-bigquery pycarlo
@@ -28,9 +28,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Push BigQuery lineage to Monte Carlo")
     parser.add_argument("--project-id", default=os.getenv("BIGQUERY_PROJECT_ID"))  # ← SUBSTITUTE
     parser.add_argument("--region", default=os.getenv("BIGQUERY_REGION", "us"))    # ← SUBSTITUTE
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--lookback-hours", type=int, default=LOOKBACK_HOURS)
     parser.add_argument("--output-file", default="lineage_output.json")
     parser.add_argument("--push-result-file", default="lineage_push_result.json")

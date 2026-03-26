@@ -129,8 +129,8 @@ Load credentials from environment variables (recommended):
 ```python
 import os
 service = IngestionService(mc_client=Client(session=Session(
-    mcd_id=os.environ["MC_INGEST_KEY_ID"],
-    mcd_token=os.environ["MC_INGEST_KEY_TOKEN"],
+    mcd_id=os.environ["MCD_INGEST_ID"],
+    mcd_token=os.environ["MCD_INGEST_TOKEN"],
     scope="Ingestion",
 )))
 ```
@@ -143,8 +143,8 @@ The collection script templates use these env var names by default:
 
 | Variable | Key type | Used by |
 |---|---|---|
-| `MC_INGEST_KEY_ID` | Ingestion key ID | collect_*.py scripts |
-| `MC_INGEST_KEY_TOKEN` | Ingestion key secret | collect_*.py scripts |
-| `MC_API_KEY_ID` | GraphQL API key ID | verify_*.py scripts, slash commands |
-| `MC_API_KEY_TOKEN` | GraphQL API key secret | verify_*.py scripts, slash commands |
-| `MC_RESOURCE_UUID` | Warehouse UUID | all scripts |
+| `MCD_INGEST_ID` | Ingestion key ID | push scripts |
+| `MCD_INGEST_TOKEN` | Ingestion key secret | push scripts |
+| `MCD_ID` | GraphQL API key ID | verification scripts, slash commands |
+| `MCD_TOKEN` | GraphQL API key secret | verification scripts, slash commands |
+| `MCD_RESOURCE_UUID` | Warehouse UUID | all scripts |

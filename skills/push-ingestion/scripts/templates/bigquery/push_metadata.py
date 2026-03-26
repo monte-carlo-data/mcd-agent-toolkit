@@ -8,8 +8,8 @@ into batches to stay under the 1 MB compressed limit.
 Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
 
 Prerequisites:
   pip install pycarlo
@@ -141,9 +141,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Push BigQuery metadata from a manifest to Monte Carlo",
     )
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--input-file", default="metadata_output.json")
     parser.add_argument("--output-file", default="metadata_push_result.json")
     parser.add_argument(
