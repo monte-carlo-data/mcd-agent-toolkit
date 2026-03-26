@@ -1,0 +1,20 @@
+{
+    "name": "mc-push-ingestion",
+    "version": "1.0.0",
+    "description": "Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo via the push ingestion API.",
+    "author": {
+        "name": "Monte Carlo Data",
+        "url": "https://www.montecarlodata.com"
+    },
+    "repository": "https://github.com/monte-carlo-data/mcd-agent-toolkit",
+    "license": "Apache-2.0",
+    "keywords": [
+        "monte-carlo",
+        "data-observability",
+        "push-ingestion",
+        "metadata",
+        "lineage"
+    ],
+    "skills": "./skills/",
+    "commands": "./commands/"
+}

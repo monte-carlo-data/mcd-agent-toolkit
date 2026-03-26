@@ -1,0 +1,7 @@
+{
+  "YET": {
+    "in_progress": { "id": "c4de3f16-c918-492b-a567-736902d01fd0", "name": "In Progress" },
+    "in_review":   { "id": "77a28437-bcea-4186-a0f9-6c58396493d9", "name": "In Review" },
+    "done":        { "id": "d941488d-c117-42d3-a529-3c9f261040fc", "name": "Done" }
+  }
+}

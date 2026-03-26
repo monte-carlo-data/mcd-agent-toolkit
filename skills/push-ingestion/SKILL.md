@@ -1,0 +1,209 @@
+---
+name: push-ingestion
+description: >
+  Expert guide for Monte Carlo's push ingestion model. Use this skill whenever a customer
+  or engineer mentions: pushing data to Monte Carlo, the IngestionService, pycarlo push APIs,
+  build me a collection script, push metadata/lineage/query logs, invocation_id tracing,
+  custom lineage nodes or edges, deleting push tables, or any question about why pushed data
+  is not showing up. Also trigger when they ask to generate code that collects metadata,
+  table schema, row counts, freshness, lineage, or query history from any data warehouse or
+  data source and sends it to Monte Carlo. If the user mentions any warehouse, database, or
+  data platform alongside any Monte Carlo topic, this skill is almost certainly relevant.
+---
+
+# Monte Carlo Push Ingestion
+
+You are an agent that helps customers collect metadata, lineage, and query logs from their
+data warehouses and push that data to Monte Carlo via the push ingestion API. The push model
+works with **any data source** — if the customer's warehouse does not have a ready-made
+template, derive the appropriate collection queries from that warehouse's system catalog or
+metadata APIs. The push format and pycarlo SDK calls are the same regardless of source.
+
+Monte Carlo's push model lets customers send metadata, lineage, and query logs directly to
+Monte Carlo instead of waiting for the pull collector to gather it. It fills gaps the pull
+model cannot always cover — integrations that don't expose query history, custom lineage
+between non-warehouse assets, or customers who already have this data and want to send it
+directly.
+
+Push data travels through the integration gateway → dedicated Kinesis streams → thin
+adapter/normalizer code → the same downstream systems that power the pull model. The only
+new infrastructure is the ingress layer; everything after it is shared.
+
+## What this skill can build for you
+
+Tell Claude your warehouse or data platform and Monte Carlo resource UUID and this skill will
+generate a ready-to-run Python script that:
+- Connects to your warehouse using the idiomatic driver for that platform
+- Discovers databases, schemas, and tables
+- Extracts the right columns — names, types, row counts, byte counts, last modified time, descriptions
+- Builds the correct pycarlo `RelationalAsset`, `LineageEvent`, or `QueryLogEntry` objects
+- Pushes to Monte Carlo and saves an output manifest with the `invocation_id` for tracing
+
+Templates are available for common warehouses (Snowflake, BigQuery, Databricks, Redshift,
+Hive). For any other platform, Claude will derive the appropriate collection queries from
+the warehouse's system catalog or metadata APIs and generate an equivalent script.
+
+## Reference docs — when to load
+
+| Reference file | Load when… |
+|---|---|
+| `references/prerequisites.md` | Customer is setting up for the first time, has auth errors, or needs help creating API keys |
+| `references/push-metadata.md` | Building or debugging a metadata collection script |
+| `references/push-lineage.md` | Building or debugging a lineage collection script |
+| `references/push-query-logs.md` | Building or debugging a query log collection script |
+| `references/custom-lineage.md` | Customer needs custom lineage nodes or edges via GraphQL |
+| `references/validation.md` | Verifying pushed data, running GraphQL checks, or deleting push-ingested tables |
+| `references/direct-http-api.md` | Customer wants to call push APIs directly via curl/HTTP without pycarlo |
+| `references/anomaly-detection.md` | Customer asks why freshness or volume detectors aren't firing |
+
+## Prerequisites — read this first
+
+→ Load `references/prerequisites.md`
+
+Two separate API keys are required. This is the most common setup stumbling block:
+- **Ingestion key** (scope=Ingestion) — for pushing data
+- **GraphQL API key** — for verification queries
+
+Both use the same `x-mcd-id` / `x-mcd-token` headers but point to different endpoints.
+
+## What you can push
+
+| Flow | pycarlo method | Push endpoint | Type field | Expiration |
+|---|---|---|---|---|
+| Table metadata | `send_metadata()` | `/ingest/v1/metadata` | `resource_type` (e.g. `"data-lake"`) | **Never expires** |
+| Table lineage | `send_lineage()` with `event_type=LINEAGE` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Never expires** |
+| Column lineage | `send_lineage()` with `event_type=COLUMN_LINEAGE` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Expires after 10 days** |
+| Query logs | `send_query_logs()` | `/ingest/v1/querylogs` | **`log_type`** (not `resource_type`!) | Same as pulled |
+| Custom lineage | GraphQL mutations | `api.getmontecarlo.com/graphql` | N/A — uses GraphQL API key | 7 days default; set `expireAt: "9999-12-31"` for permanent |
+
+**Important**: Query logs use `log_type` instead of `resource_type`. This is the only push
+endpoint where the field name differs. See `references/push-query-logs.md` for the full list
+of supported `log_type` values.
+
+The pycarlo SDK is optional — you can also call the push APIs directly via HTTP/curl. See
+`references/direct-http-api.md` for examples.
+
+Every push returns an `invocation_id` — save it. It is your primary debugging handle across
+all downstream systems.
+
+## Step 1 — Generate your collection scripts
+
+Ask Claude to build the script for your warehouse:
+
+> "Build me a metadata collection script for Snowflake. My MC resource UUID is `abc-123`."
+
+The script templates in `scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
+are **examples** that illustrate the collection and push pattern — how to query system catalogs,
+build pycarlo objects, and call the push API. **They are not an exhaustive list.** If the
+customer's warehouse is not listed, use the templates as a guide and determine the appropriate
+queries or file-collection approach for their platform. For file-based sources (like Hive
+Metastore logs), provide the command to retrieve the file, parse it, and transform it into the
+format required by the push APIs. The push format and SDK calls are identical regardless of
+source; only the collection queries change.
+
+**Batching**: For large payloads, split events into batches. The compressed request body must
+not exceed **1MB** (Kinesis limit). All push endpoints support batching.
+
+**Push frequency**: Push at most **once per hour**. Sub-hourly pushes produce unpredictable
+anomaly detector behavior because the training pipeline aggregates into hourly buckets.
+
+**Per flow, see:**
+- Metadata (schema + volume + freshness): `references/push-metadata.md`
+- Table and column lineage: `references/push-lineage.md`
+- Query logs: `references/push-query-logs.md`
+
+## Step 2 — Validate pushed data
+
+After pushing, verify data is visible in Monte Carlo using the GraphQL API (GraphQL API key).
+
+→ `references/validation.md` — all verification queries (getTable, getMetricsV4,
+getTableLineage, getDerivedTablesPartialLineage, getAggregatedQueries)
+
+Timing expectations:
+- **Metadata**: visible within a few minutes
+- **Table lineage**: visible within seconds to a few minutes (fast direct path to Neo4j)
+- **Column lineage**: a few minutes
+- **Query logs**: at least **15-20 minutes** (async processing pipeline)
+
+## Step 3 — Anomaly detection (optional)
+
+If you want Monte Carlo's freshness and volume detectors to fire on pushed data, you need to
+push consistently over time — detectors require historical data to train.
+
+→ `references/anomaly-detection.md` — recommended push frequency, minimum samples,
+training windows, and what to tell customers who ask why detectors aren't activating
+
+## Custom lineage nodes and edges
+
+For non-warehouse assets (dbt models, Airflow DAGs, custom ETL pipelines) or cross-resource
+lineage, use the GraphQL mutations directly:
+
+→ `references/custom-lineage.md` — `createOrUpdateLineageNode`, `createOrUpdateLineageEdge`,
+`deleteLineageNode`, and the critical `expireAt: "9999-12-31"` rule
+
+## Deleting push-ingested tables
+
+Push tables are excluded from the normal pull-based deletion flow (intentionally). To delete
+them explicitly, use `deletePushIngestedTables` — covered in `references/validation.md`
+under "Table management operations".
+
+## Available slash commands
+
+Customers can invoke these explicitly instead of describing their intent in prose:
+
+| Command | Purpose |
+|---|---|
+| `/mc-build-metadata-collector` | Generate a metadata collection script |
+| `/mc-build-lineage-collector` | Generate a lineage collection script |
+| `/mc-build-query-log-collector` | Generate a query log collection script |
+| `/mc-validate-metadata` | Verify pushed metadata via the GraphQL API |
+| `/mc-validate-lineage` | Verify pushed lineage via the GraphQL API |
+| `/mc-validate-query-logs` | Verify pushed query logs via the GraphQL API |
+| `/mc-create-lineage-node` | Create a custom lineage node |
+| `/mc-create-lineage-edge` | Create a custom lineage edge |
+| `/mc-delete-lineage-node` | Delete a custom lineage node |
+| `/mc-delete-push-tables` | Delete push-ingested tables |
+
+## Debugging checkpoints
+
+When pushed data isn't appearing, work through these five checkpoints in order:
+
+1. **Did the SDK return a `202` and an `invocation_id`?**
+   If not, the gateway rejected the request — check auth headers and `resource.uuid`.
+
+2. **Is the integration key the right type?**
+   Must be scope `Ingestion`, created via `montecarlo integrations create-key --scope Ingestion`.
+   A standard GraphQL API key will not work for push.
+
+3. **Is `resource.uuid` correct and authorized?**
+   The key can be scoped to specific warehouse UUIDs. If the UUID doesn't match, you get `403`.
+
+4. **Did the normalizer process it?**
+   Use the `invocation_id` to search CloudWatch logs for the relevant Lambda. For query logs,
+   check the `log_type` — Hive requires `"hive-s3"`, not `"hive"`.
+
+5. **Did the downstream system pick it up?**
+   - Metadata: query `getTable` in GraphQL
+   - Table lineage: check Neo4j within seconds–minutes (fast path via PushLineageProcessor)
+   - Query logs: wait at least 15-20 minutes; check `getAggregatedQueries`
+
+## Known gotchas
+
+- **`log_type` vs `resource_type`**: metadata and lineage use `resource_type` (e.g. `"data-lake"`);
+  query logs use **`log_type`** — the only endpoint where the field name differs. Wrong value →
+  `Unsupported ingest query-log log_type` error.
+- **`invocation_id` must be saved**: every output manifest should include it — it's your
+  only tracing handle once the request leaves the SDK.
+- **Query log async delay**: at least 15-20 minutes. `getAggregatedQueries` will return 0 until
+  processing completes — this is expected, not a bug.
+- **Custom lineage `expireAt` defaults to 7 days**: nodes vanish silently unless you set
+  `expireAt: "9999-12-31"` for permanent nodes.
+- **Push tables are never auto-deleted**: the periodic cleanup job excludes them by default
+  (`exclude_push_tables=True`). Delete them explicitly via `deletePushIngestedTables` (max
+  1,000 MCONs per call; also deletes lineage nodes and all edges touching those nodes).
+- **Anomaly detectors need history**: pushing once is not enough. Freshness needs 7+ pushes
+  over ~2 weeks; volume needs 10–48 samples over ~42 days. Push at most once per hour.
+- **Batching required for large payloads**: the compressed request body must not exceed 1MB.
+  Split large event lists into batches.
+- **Column lineage expires after 10 days**: unlike table metadata and table lineage (which
+  never expire), column lineage has a 10-day TTL, same as pulled column lineage.

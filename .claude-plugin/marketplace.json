@@ -15,6 +15,11 @@
             "name": "mc-generate-validation-notebook",
             "source": "./plugins/claude-code/generate-validation-notebook",
             "description": "Generate Monte Carlo validation notebooks."
+        },
+        {
+            "name": "mc-push-ingestion",
+            "source": "./plugins/claude-code/push-ingestion",
+            "description": "Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo."
         }
     ]
 }

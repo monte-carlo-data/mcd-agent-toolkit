@@ -1,0 +1,156 @@
+{
+  "skill": "montecarlo-push-ingestion",
+  "description": "Trigger accuracy evals for the montecarlo-push-ingestion skill. Each case specifies whether the skill SHOULD or SHOULD NOT be triggered by the given prompt.",
+  "cases": [
+    {
+      "id": "should-01",
+      "prompt": "I need to push table metadata from our Snowflake warehouse to Monte Carlo. Where do I start?",
+      "expected": "trigger",
+      "rationale": "Directly asks about pushing metadata from a specific warehouse"
+    },
+    {
+      "id": "should-02",
+      "prompt": "We're using a custom data lake and want to send lineage to Monte Carlo without setting up a full integration. How?",
+      "expected": "trigger",
+      "rationale": "Push lineage from a non-standard source — core push ingestion use case"
+    },
+    {
+      "id": "should-03",
+      "prompt": "Can you generate a Python script to collect metadata from our BigQuery warehouse and push it to Monte Carlo?",
+      "expected": "trigger",
+      "rationale": "Explicit request to generate a collection and push script"
+    },
+    {
+      "id": "should-04",
+      "prompt": "How do I create a collection script for our Redshift cluster?",
+      "expected": "trigger",
+      "rationale": "Building a collection script for a supported warehouse"
+    },
+    {
+      "id": "should-05",
+      "prompt": "We've been pushing freshness and row count data to Monte Carlo every hour for the past week but the volume anomaly detector still hasn't activated. What are we doing wrong?",
+      "expected": "trigger",
+      "rationale": "Push ingestion + anomaly detection not firing — directly covered by anomaly-detection reference"
+    },
+    {
+      "id": "should-06",
+      "prompt": "How do I push query logs from Databricks to Monte Carlo?",
+      "expected": "trigger",
+      "rationale": "Explicit push query logs request for a specific warehouse"
+    },
+    {
+      "id": "should-07",
+      "prompt": "What's an invocation_id and why does every push response include one?",
+      "expected": "trigger",
+      "rationale": "invocation_id is a push-ingestion-specific concept"
+    },
+    {
+      "id": "should-08",
+      "prompt": "I pushed lineage yesterday but the graph in the UI still shows no edges. What should I check?",
+      "expected": "trigger",
+      "rationale": "Debugging pushed lineage not appearing — validation + debugging checkpoints"
+    },
+    {
+      "id": "should-09",
+      "prompt": "How do I create a custom lineage node for a Kafka topic that Monte Carlo doesn't know about?",
+      "expected": "trigger",
+      "rationale": "Custom lineage nodes for non-warehouse assets — covered in custom-lineage reference"
+    },
+    {
+      "id": "should-10",
+      "prompt": "We need to delete all the tables we pushed during testing. How do I do that without touching production tables?",
+      "expected": "trigger",
+      "rationale": "Deleting push-ingested tables — explicitly covered in the skill"
+    },
+    {
+      "id": "should-11",
+      "prompt": "I want to push metadata to Monte Carlo using curl without installing pycarlo. Can you show me the HTTP request format?",
+      "expected": "trigger",
+      "rationale": "Direct HTTP API usage for push ingestion — covered in direct-http-api reference"
+    },
+    {
+      "id": "should-12",
+      "prompt": "We use Teradata and need to push query logs to Monte Carlo. There's no built-in integration for it.",
+      "expected": "trigger",
+      "rationale": "Unsupported warehouse requesting push ingestion — skill should handle any warehouse"
+    },
+    {
+      "id": "should-13",
+      "prompt": "We have about 50,000 tables to push to Monte Carlo and keep getting errors about payload size being too large. What's the limit?",
+      "expected": "trigger",
+      "rationale": "Batching and payload size limits — directly covered by 1MB compressed limit guidance"
+    },
+    {
+      "id": "should-14",
+      "prompt": "Does pushed metadata expire in Monte Carlo or do we need to keep re-pushing it periodically?",
+      "expected": "trigger",
+      "rationale": "Expiration/TTL question for push ingestion — covered in expiration documentation"
+    },
+    {
+      "id": "should-15",
+      "prompt": "I pushed test tables during development and now there are orphaned lineage nodes in the graph. How do I clean up everything including the edges?",
+      "expected": "trigger",
+      "rationale": "Delete push tables with lineage cleanup — covered in deletePushIngestedTables docs"
+    },
+    {
+      "id": "should-not-01",
+      "prompt": "How do I set up a Monte Carlo monitor to alert on row count drops?",
+      "expected": "no-trigger",
+      "rationale": "Monitor configuration — pull-based, not push ingestion"
+    },
+    {
+      "id": "should-not-02",
+      "prompt": "Our dbt lineage isn't showing up in Monte Carlo. What's going on?",
+      "expected": "no-trigger",
+      "rationale": "dbt lineage is collected via the pull integration, not push ingestion"
+    },
+    {
+      "id": "should-not-03",
+      "prompt": "How do I configure Monte Carlo's Slack notifications for incidents?",
+      "expected": "no-trigger",
+      "rationale": "Notification configuration — unrelated to push ingestion"
+    },
+    {
+      "id": "should-not-04",
+      "prompt": "Can you help me write a SQL query to find duplicate records in our warehouse?",
+      "expected": "no-trigger",
+      "rationale": "General SQL — no Monte Carlo push ingestion context"
+    },
+    {
+      "id": "should-not-05",
+      "prompt": "The Monte Carlo UI is showing a freshness alert on a table we deleted months ago. How do I dismiss it?",
+      "expected": "no-trigger",
+      "rationale": "Alert management on pull-collected tables — not push ingestion"
+    },
+    {
+      "id": "should-not-06",
+      "prompt": "How do I add a Monte Carlo integration for Fivetran?",
+      "expected": "no-trigger",
+      "rationale": "Fivetran is a pull integration — not the push model"
+    },
+    {
+      "id": "should-not-07",
+      "prompt": "How do I use the Monte Carlo CLI to manage monitors?",
+      "expected": "no-trigger",
+      "rationale": "CLI monitor management — unrelated to push ingestion"
+    },
+    {
+      "id": "should-not-08",
+      "prompt": "We want to track data quality for a new pipeline. What monitors should we set up in Monte Carlo?",
+      "expected": "no-trigger",
+      "rationale": "Monitor setup guidance — pull-based data quality, not push ingestion"
+    },
+    {
+      "id": "should-not-09",
+      "prompt": "Can you explain how Monte Carlo detects schema changes automatically?",
+      "expected": "no-trigger",
+      "rationale": "Automatic schema change detection is a pull collector feature, not push"
+    },
+    {
+      "id": "should-not-10",
+      "prompt": "How do I create a field health monitor for a specific column in Monte Carlo?",
+      "expected": "no-trigger",
+      "rationale": "Field health monitor configuration — pull-based, not push ingestion"
+    }
+  ]
+}
