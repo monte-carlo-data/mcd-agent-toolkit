@@ -110,21 +110,6 @@ RelationalAsset(
 )
 ```
 
-## NEVER use these — deprecated API names
-
-If you find yourself typing any name from the left column, **STOP** and use the right column.
-
-| Wrong (DO NOT USE) | Correct |
-|---|---|
-| `pycarlo.features.push_ingestion` | `pycarlo.features.ingestion` |
-| `PushIngestion` | `IngestionService` |
-| `ColumnMetadata` | `AssetField` |
-| `push_relational_assets()` | `send_metadata()` |
-| `push_lineage()` | `send_lineage()` |
-| `push_query_logs()` | `send_query_logs()` |
-| `Session(mcd_endpoint=...)` | `Session(mcd_id=..., mcd_token=..., scope="Ingestion")` |
-| Flat `RelationalAsset(database=..., schema=..., table_name=..., columns=...)` | Nested: `RelationalAsset(metadata=AssetMetadata(...), fields=[AssetField(...)], volume=..., freshness=...)` |
-
 ## Environment variable conventions
 
 All generated scripts MUST use these exact variable names. Do NOT invent alternatives like
