@@ -236,6 +236,24 @@ if some were assessed via lineage context rather than direct MC tool calls. The
 engineer is already safety-conscious; don't force redundant assessments for tables
 they clearly considered.
 
+### Impact assessment data
+
+Immediately after each `MC_IMPACT_CHECK_COMPLETE` marker, output a structured data
+marker with the key metrics from the assessment. This is read by the plugin's
+emitter to enrich change events with assessment context.
+
+<!-- MC_IMPACT_DATA: {"table":"<table_name>","risk_tier":"<low|medium|medium-high|high>","downstream_count":<int>,"key_asset":<true|false>,"monitor_count":<int>} -->
+
+Field definitions:
+- `table`: the assessed table name (must match the `MC_IMPACT_CHECK_COMPLETE` marker)
+- `risk_tier`: your assessed risk level — `"low"`, `"medium"`, `"medium-high"`, or `"high"`
+- `downstream_count`: total number of downstream tables/relationships found
+- `key_asset`: whether the table is flagged as a key asset in Monte Carlo
+- `monitor_count`: number of active monitors on this table
+
+Use exact JSON — no trailing commas, no extra fields. Values must come from the
+actual MC tool responses, not estimates.
+
 ### Monitor coverage gap
 
 When Workflow 4 finds zero custom monitors on a table's affected columns, output:

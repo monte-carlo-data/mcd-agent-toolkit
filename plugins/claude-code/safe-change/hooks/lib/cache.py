@@ -21,9 +21,10 @@ MG_PREFIX = "mc_safe_change_mg_"
 TURN_PREFIX = "mc_safe_change_turn_"
 PENDING_PREFIX = "mc_safe_change_pending_"
 DBT_CONFIG_PREFIX = "mc_safe_change_dbt_config_"
+COMMIT_PREFIX = "mc_safe_change_commit_"
 CLEANUP_MARKER = "mc_safe_change_last_cleanup"
 
-ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX)
+ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX, COMMIT_PREFIX)
 STALE_THRESHOLD_SECONDS = 6 * 3600  # 6 hours — covers long sessions, cleans between days
 
 # dbt_project.yml defaults per https://docs.getdbt.com/reference/project-configs
@@ -185,6 +186,30 @@ def clear_pending_validation(session_id: str) -> None:
     path = _pending_path(session_id)
     if os.path.exists(path):
         os.remove(path)
+
+
+# --- Last commit hash (for intent extraction) ---
+
+def _commit_path(session_id: str) -> str:
+    return os.path.join(CACHE_DIR, f"{COMMIT_PREFIX}{_validate_session_id(session_id)}")
+
+
+def get_last_commit_hash(session_id: str) -> str | None:
+    """Return the HEAD commit hash from the last emit, or None."""
+    path = _commit_path(session_id)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            value = f.read().strip()
+        return value or None
+    except OSError:
+        return None
+
+
+def set_last_commit_hash(session_id: str, commit_hash: str) -> None:
+    """Cache the current HEAD hash for next emit comparison."""
+    _write_secure(_commit_path(session_id), commit_hash)
 
 
 # --- dbt project config cache ---

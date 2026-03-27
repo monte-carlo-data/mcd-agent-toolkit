@@ -14,6 +14,7 @@ from lib.cache import (
     has_monitor_gap,
     move_to_pending_validation,
 )
+from lib import emitter
 
 
 @safe_run
@@ -29,6 +30,10 @@ def main():
 
     if not tables:
         return
+
+    # Emit change event (non-blocking, before validation logic)
+    transcript_path = input_data.get("transcript_path", "")
+    emitter.emit(session_id, transcript_path, tables)
 
     # If validation was already prompted (pending tables exist), silently merge
     # new edits into pending rather than re-prompting. This prevents the double-

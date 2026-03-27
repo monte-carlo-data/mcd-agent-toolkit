@@ -131,3 +131,55 @@ class TestTurnEndHook:
         parsed = json.loads(output)
         assert parsed["decision"] == "block"
         assert "orders" in parsed["reason"]
+
+    def test_emitter_called_when_tables_edited(self, capsys):
+        """Emitter should fire whenever tables were edited in this turn."""
+        cache.add_edited_table("test_session", "orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
+
+        from turn_end_hook import main
+        with patch("sys.stdin", StringIO(_make_stdin())):
+            with patch("lib.emitter.emit") as mock_emit:
+                main()
+
+        mock_emit.assert_called_once_with(
+            "test_session",
+            "/tmp/test_transcript.jsonl",
+            ["orders"],
+        )
+
+    def test_emitter_called_on_silent_merge(self, capsys):
+        """Emitter fires even when turn merges silently into pending."""
+        cache.add_edited_table("test_session", "orders")
+        cache.move_to_pending_validation("test_session")
+        cache.add_edited_table("test_session", "customers")
+
+        from turn_end_hook import main
+        with patch("sys.stdin", StringIO(_make_stdin())):
+            with patch("lib.emitter.emit") as mock_emit:
+                main()
+
+        mock_emit.assert_called_once_with(
+            "test_session",
+            "/tmp/test_transcript.jsonl",
+            ["customers"],
+        )
+
+    def test_emitter_not_called_when_no_tables(self, capsys):
+        from turn_end_hook import main
+        with patch("sys.stdin", StringIO(_make_stdin())):
+            with patch("lib.emitter.emit") as mock_emit:
+                main()
+
+        mock_emit.assert_not_called()
+
+    def test_emitter_not_called_when_stop_hook_active(self, capsys):
+        cache.add_edited_table("test_session", "orders")
+
+        from turn_end_hook import main
+        with patch("sys.stdin", StringIO(_make_stdin(stop_hook_active=True))):
+            with patch("lib.emitter.emit") as mock_emit:
+                main()
+
+        mock_emit.assert_not_called()

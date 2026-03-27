@@ -4,6 +4,7 @@ import time
 import json
 import pytest
 
+import lib.cache as cache
 from lib.cache import (
     CACHE_DIR,
     IC_PREFIX,
@@ -145,3 +146,27 @@ class TestFilePermissions:
         move_to_pending_validation("perm_test_session2")
         path = os.path.join(CACHE_DIR, f"{PENDING_PREFIX}perm_test_session2")
         assert self._get_perms(path) == 0o600
+
+
+class TestLastCommitCache:
+    def test_get_returns_none_when_no_cache(self):
+        assert cache.get_last_commit_hash("sess1") is None
+
+    def test_set_and_get(self):
+        cache.set_last_commit_hash("sess1", "abc123def456")
+        assert cache.get_last_commit_hash("sess1") == "abc123def456"
+
+    def test_overwrite(self):
+        cache.set_last_commit_hash("sess1", "abc123")
+        cache.set_last_commit_hash("sess1", "def456")
+        assert cache.get_last_commit_hash("sess1") == "def456"
+
+    def test_independent_sessions(self):
+        cache.set_last_commit_hash("sess1", "hash1")
+        cache.set_last_commit_hash("sess2", "hash2")
+        assert cache.get_last_commit_hash("sess1") == "hash1"
+        assert cache.get_last_commit_hash("sess2") == "hash2"
+
+    def test_empty_string_returns_none(self):
+        cache.set_last_commit_hash("sess1", "")
+        assert cache.get_last_commit_hash("sess1") is None
