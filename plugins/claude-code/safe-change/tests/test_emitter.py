@@ -306,3 +306,87 @@ class TestEmit:
         assert event["session_id"] == "sess1"
         assert event["identity"]["git_email"] == "a@b.com"
         assert event["changes"] == [{"table_name": "orders"}]
+
+
+class TestEndToEnd:
+    def test_dry_run_full_event(self, tmp_path, capsys):
+        """Full flow via dry_run: cache setup -> emit -> verify event from stderr."""
+        # Set up cache state
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
+        cache.mark_monitor_gap("orders")
+        cache.set_last_commit_hash("sess1", "old_hash")
+
+        # Create transcript
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('{"role":"user","message":"fix the join"}\n')
+
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "a@b.com", "git_name": "A"}):
+            with patch("lib.emitter._get_current_head", return_value="new_hash"):
+                with patch("lib.emitter._get_commit_message", return_value="Fix stale join"):
+                    with patch.dict(os.environ, {"MCD_ID": "x", "MC_EMIT_EVENTS": "dry_run"}):
+                        emit("sess1", str(transcript), ["orders"])
+
+        # Parse the event from stderr
+        captured = capsys.readouterr()
+        event = json.loads(captured.err)
+
+        # Verify complete event structure
+        assert event["event_type"] == "safe_change.turn_completed"
+        assert event["event_version"] == "1.0"
+        assert event["timestamp"].endswith("Z")
+        assert event["session_id"] == "sess1"
+        assert event["identity"] == {"git_email": "a@b.com", "git_name": "A"}
+        assert event["changes"] == [{"table_name": "orders"}]
+        assert event["workflows"]["impact_check_fired"] is True
+        assert event["workflows"]["edit_gated"] is True
+        assert event["workflows"]["validation_prompted"] is True
+        assert event["workflows"]["monitor_gap_detected"] is True
+        assert event["intent"] == {"summary": "Fix stale join", "source": "commit_message"}
+
+    def test_real_http_send_to_local_server(self):
+        """Verify _send() makes a real HTTP POST with correct payload."""
+        import threading
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+
+        captured = {}
+
+        class CaptureHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length", 0))
+                captured["body"] = json.loads(self.rfile.read(length))
+                captured["headers"] = dict(self.headers)
+                self.send_response(202)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"accepted"}')
+
+            def log_message(self, format, *args):
+                pass  # suppress server logs in test output
+
+        # Start local server on a random available port
+        server = HTTPServer(("127.0.0.1", 0), CaptureHandler)
+        port = server.server_address[1]
+        server_thread = threading.Thread(target=server.handle_request, daemon=True)
+        server_thread.start()
+
+        # Send a real event to the local server
+        event = {
+            "event_type": "safe_change.turn_completed",
+            "event_version": "1.0",
+            "session_id": "test-123",
+            "changes": [{"table_name": "orders"}],
+        }
+        with patch.dict(os.environ, {"MCD_ID": "key1", "MCD_TOKEN": "tok1"}):
+            with patch("lib.emitter.MC_CHANGE_EVENTS_URL", f"http://127.0.0.1:{port}/plugin/change-events"):
+                _send(event)
+
+        server_thread.join(timeout=5)
+        server.server_close()
+
+        # Verify the payload arrived
+        # Note: urllib.request title-cases header names (e.g. x-mcd-id -> X-Mcd-Id)
+        assert captured["body"] == event
+        assert captured["headers"]["X-Mcd-Id"] == "key1"
+        assert captured["headers"]["X-Mcd-Token"] == "tok1"
+        assert captured["headers"]["Content-Type"] == "application/json"
