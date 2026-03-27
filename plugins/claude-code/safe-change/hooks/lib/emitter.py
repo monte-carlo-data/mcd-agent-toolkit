@@ -126,3 +126,37 @@ def _extract_workflow_flags(session_id, edited_tables):
         "monitor_gap_detected": any(has_monitor_gap(t) for t in edited_tables),
         "monitor_generated": None,
     }
+
+
+def _build_event(session_id, transcript_path, edited_tables):
+    """Assemble the change event from local cache state."""
+    return {
+        "event_type": "safe_change.turn_completed",
+        "event_version": "1.0",
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "session_id": session_id,
+        "identity": _get_git_identity(),
+        "changes": [{"table_name": t} for t in edited_tables],
+        "workflows": _extract_workflow_flags(session_id, edited_tables),
+        "intent": _extract_intent(session_id, transcript_path),
+    }
+
+
+def _send(event):
+    """POST to MC API. 3s timeout. Silently drop on any failure."""
+    try:
+        req = urllib.request.Request(
+            url=MC_CHANGE_EVENTS_URL,
+            data=json.dumps(event).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "x-mcd-id": os.environ.get("MCD_ID", ""),
+                "x-mcd-token": os.environ.get("MCD_TOKEN", ""),
+            },
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except Exception:
+        pass
+
+

@@ -159,3 +159,82 @@ class TestExtractIntent:
             result = _extract_intent("sess1", str(transcript))
 
         assert result == {"summary": "fix the bug", "source": "transcript"}
+
+
+from lib.emitter import _build_event, _send
+
+
+class TestBuildEvent:
+    def test_event_structure(self):
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
+
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "a@b.com", "git_name": "A"}):
+            with patch("lib.emitter._extract_intent", return_value=None):
+                event = _build_event("sess1", "/tmp/t.jsonl", ["orders"])
+
+        assert event["event_type"] == "safe_change.turn_completed"
+        assert event["event_version"] == "1.0"
+        assert "timestamp" in event
+        assert event["session_id"] == "sess1"
+        assert event["identity"] == {"git_email": "a@b.com", "git_name": "A"}
+        assert event["changes"] == [{"table_name": "orders"}]
+        assert event["workflows"]["impact_check_fired"] is True
+        assert event["intent"] is None
+
+    def test_multiple_tables(self):
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
+            with patch("lib.emitter._extract_intent", return_value=None):
+                event = _build_event("sess1", "/tmp/t.jsonl", ["orders", "customers"])
+
+        assert len(event["changes"]) == 2
+        assert event["changes"][0]["table_name"] == "orders"
+        assert event["changes"][1]["table_name"] == "customers"
+
+    def test_timestamp_is_utc_iso(self):
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
+            with patch("lib.emitter._extract_intent", return_value=None):
+                event = _build_event("sess1", "/tmp/t.jsonl", ["orders"])
+
+        assert event["timestamp"].endswith("Z")
+        datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
+
+    def test_event_includes_intent_from_commit(self):
+        cache.mark_impact_check_injected("orders")
+        cache.set_last_commit_hash("sess1", "old_hash")
+
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
+            with patch("lib.emitter._get_current_head", return_value="new_hash"):
+                with patch("lib.emitter._get_commit_message", return_value="Fix join"):
+                    event = _build_event("sess1", "/tmp/t.jsonl", ["orders"])
+
+        assert event["intent"] == {"summary": "Fix join", "source": "commit_message"}
+
+
+class TestSend:
+    def test_posts_to_mc(self):
+        event = {"event_type": "test"}
+        with patch.dict(os.environ, {"MCD_ID": "id1", "MCD_TOKEN": "tok1"}):
+            with patch("lib.emitter.urllib.request.urlopen") as mock_urlopen:
+                _send(event)
+
+        mock_urlopen.assert_called_once()
+        req = mock_urlopen.call_args[0][0]
+        assert req.method == "POST"
+        body = json.loads(req.data.decode())
+        assert body == event
+        assert req.get_header("X-mcd-id") == "id1"
+        assert req.get_header("X-mcd-token") == "tok1"
+        assert req.get_header("Content-type") == "application/json"
+
+    def test_silently_drops_on_failure(self):
+        with patch("lib.emitter.urllib.request.urlopen", side_effect=Exception("network")):
+            _send({"event_type": "test"})  # should not raise
+
+    def test_timeout_3s(self):
+        with patch("lib.emitter.urllib.request.urlopen") as mock_urlopen:
+            _send({"event_type": "test"})
+        _, kwargs = mock_urlopen.call_args
+        assert kwargs.get("timeout") == 3
+
+
