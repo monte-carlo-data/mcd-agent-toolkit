@@ -65,7 +65,7 @@ from pycarlo.features.ingestion.models import (
     # Metadata
     RelationalAsset, AssetMetadata, AssetField, AssetVolume, AssetFreshness, Tag,
     # Lineage
-    LineageEvent, LineageAssetRef, ColumnLineageField, ColumnLineageSourceField, LineageEventType,
+    LineageEvent, LineageAssetRef, ColumnLineageField, ColumnLineageSourceField,
     # Query logs
     QueryLogEntry,
 )
@@ -81,13 +81,13 @@ service = IngestionService(mc_client=client)
 service.send_metadata(resource_uuid=..., resource_type=..., events=[RelationalAsset(...)])
 
 # Lineage (table or column)
-service.send_lineage(resource_uuid=..., resource_type=..., events=[LineageEvent(...)], event_type=...)
+service.send_lineage(resource_uuid=..., resource_type=..., events=[LineageEvent(...)])
 
 # Query logs — note: log_type, NOT resource_type
 service.send_query_logs(resource_uuid=..., log_type=..., events=[QueryLogEntry(...)])
 
 # Extract invocation ID from any response
-IngestionService.extract_invocation_id(response)
+service.extract_invocation_id(result)
 ```
 
 ### RelationalAsset structure (nested, NOT flat)
@@ -165,8 +165,8 @@ Both use the same `x-mcd-id` / `x-mcd-token` headers but point to different endp
 | Flow | pycarlo method | Push endpoint | Type field | Expiration |
 |---|---|---|---|---|
 | Table metadata | `send_metadata()` | `/ingest/v1/metadata` | `resource_type` (e.g. `"data-lake"`) | **Never expires** |
-| Table lineage | `send_lineage()` with `event_type=LINEAGE` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Never expires** |
-| Column lineage | `send_lineage()` with `event_type=COLUMN_LINEAGE` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Expires after 10 days** |
+| Table lineage | `send_lineage()` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Never expires** |
+| Column lineage | `send_lineage()` (events include `fields`) | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Expires after 10 days** |
 | Query logs | `send_query_logs()` | `/ingest/v1/querylogs` | **`log_type`** (not `resource_type`!) | Same as pulled |
 | Custom lineage | GraphQL mutations | `api.getmontecarlo.com/graphql` | N/A — uses GraphQL API key | 7 days default; set `expireAt: "9999-12-31"` for permanent |
 
