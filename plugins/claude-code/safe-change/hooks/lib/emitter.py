@@ -30,3 +30,26 @@ def _get_git_identity():
         return {"git_email": email, "git_name": name}
     except Exception:
         return {"git_email": "", "git_name": ""}
+
+
+from lib.cache import (
+    get_impact_check_state,
+    get_pending_validation_tables,
+    has_monitor_gap,
+)
+
+
+def _extract_workflow_flags(session_id, edited_tables):
+    """Derive workflow boolean flags from cache state."""
+    ic_states = {t: get_impact_check_state(t) for t in edited_tables}
+    has_pending = bool(get_pending_validation_tables(session_id))
+    w4_tables = [t for t in edited_tables if ic_states[t] in ("injected", "verified")]
+
+    return {
+        "impact_check_fired": any(s is not None for s in ic_states.values()),
+        "edit_gated": any(s in ("injected", "verified") for s in ic_states.values()),
+        "validation_prompted": not has_pending and len(w4_tables) > 0,
+        "validation_generated": None,
+        "monitor_gap_detected": any(has_monitor_gap(t) for t in edited_tables),
+        "monitor_generated": None,
+    }
