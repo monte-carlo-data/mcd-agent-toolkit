@@ -76,3 +76,86 @@ class TestExtractWorkflowFlags:
         result = _extract_workflow_flags("sess1", ["orders", "customers"])
         assert result["impact_check_fired"] is True
         assert result["validation_prompted"] is True
+
+
+from lib.emitter import _extract_intent
+
+
+class TestExtractIntent:
+    def test_commit_message_when_head_changed(self):
+        """When HEAD changed since last emit, use commit message."""
+        cache.set_last_commit_hash("sess1", "old_hash")
+        with patch("lib.emitter.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                MagicMock(stdout="new_hash\n", returncode=0),
+                MagicMock(stdout="Fix stale join logic\n", returncode=0),
+            ]
+            result = _extract_intent("sess1", "/tmp/nonexistent.jsonl")
+
+        assert result == {"summary": "Fix stale join logic", "source": "commit_message"}
+
+    def test_no_commit_falls_back_to_transcript(self, tmp_path):
+        """No commit happened -> fall back to first user message in transcript."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text(
+            '{"role":"user","message":"update the orders model to filter deleted records"}\n'
+            '{"role":"assistant","message":"I will update the model."}\n'
+        )
+        cache.set_last_commit_hash("sess1", "same_hash")
+        with patch("lib.emitter.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="same_hash\n", returncode=0)
+            result = _extract_intent("sess1", str(transcript))
+
+        assert result == {
+            "summary": "update the orders model to filter deleted records",
+            "source": "transcript",
+        }
+
+    def test_transcript_truncated_to_256_chars(self, tmp_path):
+        transcript = tmp_path / "transcript.jsonl"
+        long_msg = "x" * 500
+        transcript.write_text(f'{{"role":"user","message":"{long_msg}"}}\n')
+        cache.set_last_commit_hash("sess1", "same")
+        with patch("lib.emitter.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="same\n", returncode=0)
+            result = _extract_intent("sess1", str(transcript))
+
+        assert result is not None
+        assert len(result["summary"]) == 256
+
+    def test_no_prior_hash_no_transcript(self):
+        """First emit, no transcript -> intent is None."""
+        with patch("lib.emitter.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="hash1\n", returncode=0)
+            result = _extract_intent("sess1", "/nonexistent/path")
+
+        assert result is None
+
+    def test_stores_current_hash_for_next_emit(self):
+        """After extracting intent, current HEAD is cached for next comparison."""
+        with patch("lib.emitter.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="new_hash\n", returncode=0)
+            _extract_intent("sess1", "/tmp/t.jsonl")
+
+        assert cache.get_last_commit_hash("sess1") == "new_hash"
+
+    def test_commit_message_truncated_to_256(self):
+        cache.set_last_commit_hash("sess1", "old")
+        long_commit = "y" * 500
+        with patch("lib.emitter.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                MagicMock(stdout="new\n", returncode=0),
+                MagicMock(stdout=f"{long_commit}\n", returncode=0),
+            ]
+            result = _extract_intent("sess1", "/tmp/t.jsonl")
+
+        assert len(result["summary"]) == 256
+
+    def test_git_failure_falls_back_to_transcript(self, tmp_path):
+        """If git commands fail, fall back to transcript."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('{"role":"user","message":"fix the bug"}\n')
+        with patch("lib.emitter.subprocess.run", side_effect=Exception("no git")):
+            result = _extract_intent("sess1", str(transcript))
+
+        assert result == {"summary": "fix the bug", "source": "transcript"}
