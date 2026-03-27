@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import threading
+import time
 import urllib.request
 from datetime import datetime, timezone
 
@@ -160,6 +161,31 @@ def _send(event):
         pass
 
 
+_EMIT_MIN_INTERVAL = 5  # seconds — prevent tight-loop flooding
+_EMIT_MARKER_PREFIX = "mc_safe_change_emit_"
+
+
+def _rate_limit_ok(session_id):
+    """Return True if enough time has passed since the last emit for this session."""
+    path = os.path.join("/tmp", f"{_EMIT_MARKER_PREFIX}{session_id}")
+    now = time.time()
+    try:
+        if os.path.exists(path):
+            if now - os.path.getmtime(path) < _EMIT_MIN_INTERVAL:
+                return False
+    except OSError:
+        pass
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, str(now).encode())
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+    return True
+
+
 def emit(session_id, transcript_path, edited_tables):
     """Assemble event and send in background thread. Never blocks, never throws.
 
@@ -173,6 +199,8 @@ def emit(session_id, transcript_path, edited_tables):
         if mode in ("0", "false", "no"):
             return
         if not os.environ.get("MCD_ID"):
+            return
+        if not _rate_limit_ok(session_id):
             return
         event = _build_event(session_id, transcript_path, edited_tables)
         if mode == "dry_run":

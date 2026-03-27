@@ -238,7 +238,30 @@ class TestSend:
         assert kwargs.get("timeout") == 3
 
 
-from lib.emitter import emit
+from lib.emitter import emit, _rate_limit_ok
+
+
+class TestRateLimit:
+    def test_first_call_allowed(self):
+        assert _rate_limit_ok("rate_sess") is True
+
+    def test_rapid_second_call_blocked(self):
+        _rate_limit_ok("rate_sess2")
+        assert _rate_limit_ok("rate_sess2") is False
+
+    def test_allowed_after_interval(self):
+        _rate_limit_ok("rate_sess3")
+        # Backdate the marker file to make it appear old
+        import glob
+        markers = glob.glob("/tmp/mc_safe_change_emit_rate_sess3")
+        assert len(markers) == 1
+        old_time = os.path.getmtime(markers[0]) - 10
+        os.utime(markers[0], (old_time, old_time))
+        assert _rate_limit_ok("rate_sess3") is True
+
+    def test_independent_sessions(self):
+        _rate_limit_ok("rate_a")
+        assert _rate_limit_ok("rate_b") is True  # different session, not blocked
 
 
 class TestEmit:
