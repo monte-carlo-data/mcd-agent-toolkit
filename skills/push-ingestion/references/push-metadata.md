@@ -31,36 +31,35 @@ from pycarlo.features.ingestion import (
 ## Minimal example
 
 ```python
-from datetime import datetime, timezone
-
 asset = RelationalAsset(
     type="TABLE",  # ONLY "TABLE" or "VIEW" — normalize warehouse-native values
     metadata=AssetMetadata(
+        name="orders",
         database="analytics",
         schema="public",
-        table_name="orders",
         description="Order transactions",
     ),
     fields=[
-        AssetField(name="order_id", field_type="INTEGER"),
-        AssetField(name="amount",   field_type="DECIMAL"),
-        AssetField(name="created_at", field_type="TIMESTAMP"),
+        AssetField(name="order_id", type="INTEGER"),
+        AssetField(name="amount",   type="DECIMAL"),
+        AssetField(name="created_at", type="TIMESTAMP"),
     ],
     volume=AssetVolume(
         row_count=1_500_000,
-        total_byte_size=250_000_000,
+        byte_count=250_000_000,
     ),
     freshness=AssetFreshness(
-        last_update_time=datetime(2024, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+        last_update_time="2024-03-01T12:00:00Z",  # ISO 8601 string, NOT a datetime object
     ),
 )
 
 result = service.send_metadata(
     resource_uuid="<your-resource-uuid>",
     resource_type="data-lake",   # see note below on resource_type
-    assets=[asset],
+    events=[asset],
 )
-print("invocation_id:", result.invocation_id)   # save this!
+invocation_id = service.extract_invocation_id(result)
+print("invocation_id:", invocation_id)   # save this!
 ```
 
 ## resource_type
@@ -103,13 +102,13 @@ training clock).
 
 ## Batch multiple tables
 
-`assets` accepts a list. Push all tables in a single call or in batches:
+`events` accepts a list. Push all tables in a single call or in batches:
 
 ```python
 result = service.send_metadata(
     resource_uuid=resource_uuid,
     resource_type="data-lake",
-    assets=[asset1, asset2, asset3, ...],
+    events=[asset1, asset2, asset3, ...],
 )
 ```
 
@@ -123,15 +122,15 @@ from datetime import datetime, timezone
 
 manifest = {
     "resource_uuid": resource_uuid,
-    "invocation_id": result.invocation_id,   # ← critical for debugging
+    "invocation_id": service.extract_invocation_id(result),   # ← critical for debugging
     "collected_at": datetime.now(tz=timezone.utc).isoformat(),
     "assets": [
         {
             "database": a.metadata.database,
             "schema": a.metadata.schema,
-            "table": a.metadata.table_name,
+            "table": a.metadata.name,
             "row_count": a.volume.row_count if a.volume else None,
-            "fields": [{"name": f.name, "type": f.field_type} for f in a.fields],
+            "fields": [{"name": f.name, "type": f.type} for f in a.fields],
         }
         for a in assets
     ],

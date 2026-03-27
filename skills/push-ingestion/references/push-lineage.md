@@ -50,7 +50,8 @@ result = service.send_lineage(
     resource_type="data-lake",
     events=[event],
 )
-print("invocation_id:", result.invocation_id)
+invocation_id = service.extract_invocation_id(result)
+print("invocation_id:", invocation_id)
 ```
 
 ## Column lineage example
@@ -127,7 +128,7 @@ For Hive, parse the HiveServer2 log file.
 ```python
 manifest = {
     "resource_uuid": resource_uuid,
-    "invocation_id": result.invocation_id,   # ← save this
+    "invocation_id": service.extract_invocation_id(result),   # ← save this
     "collected_at": datetime.now(tz=timezone.utc).isoformat(),
     "edges": [
         {

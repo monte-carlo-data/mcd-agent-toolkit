@@ -33,7 +33,10 @@ new infrastructure is the ingress layer; everything after it is shared.
 
 When generating any push-ingestion script, you MUST:
 
-1. **Read the corresponding template** from `scripts/templates/<warehouse>/` before writing any code.
+1. **Read the corresponding template** before writing any code. Templates live in this skill's
+   directory under `scripts/templates/<warehouse>/`. To find them, glob for
+   `**/push-ingestion/scripts/templates/<warehouse>/*.py` — this works regardless of where the
+   skill is installed. Do NOT search from the current working directory alone.
 2. **Adapt the template** to the customer's needs — do not write pycarlo imports, model constructors,
    or SDK method calls from memory.
 3. If no template exists for the target warehouse, read the **Snowflake template** as the canonical
@@ -186,7 +189,7 @@ Ask Claude to build the script for your warehouse:
 
 > "Build me a metadata collection script for Snowflake. My MC resource UUID is `abc-123`."
 
-The script templates in `scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
+The script templates in `**/push-ingestion/scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
 are the **mandatory starting point** for script generation — they contain the correct pycarlo
 imports, model constructors, and SDK calls. **They are not an exhaustive list.** If the
 customer's warehouse is not listed, use the templates as a guide and determine the appropriate

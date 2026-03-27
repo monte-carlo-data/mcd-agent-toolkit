@@ -130,7 +130,7 @@ def collect(
                     fields = [
                         {
                             "name": col["column_name"],
-                            "field_type": col["data_type"].upper(),
+                            "type": col["data_type"].upper(),
                             "description": col.get("comment") or None,
                         }
                         for col in columns
