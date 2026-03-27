@@ -195,8 +195,11 @@ Metastore logs), provide the command to retrieve the file, parse it, and transfo
 format required by the push APIs. The push format and SDK calls are identical regardless of
 source; only the collection queries change.
 
-**Batching**: For large payloads, split events into batches. The compressed request body must
-not exceed **1MB** (Kinesis limit). All push endpoints support batching.
+**Batching**: For large payloads, split events into batches. Use a batch size of **50 assets**
+per push call. The pycarlo HTTP client has a hardcoded 10-second read timeout that cannot be
+overridden (`Session` and `Client` do not accept a `timeout` parameter) — larger batches (200+)
+will timeout on warehouses with thousands of tables. The compressed request body must also not
+exceed **1MB** (Kinesis limit). All push endpoints support batching.
 
 **Push frequency**: Push at most **once per hour**. Sub-hourly pushes produce unpredictable
 anomaly detector behavior because the training pipeline aggregates into hourly buckets.
