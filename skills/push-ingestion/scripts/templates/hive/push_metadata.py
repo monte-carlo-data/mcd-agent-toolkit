@@ -11,9 +11,9 @@ Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points
 -------------------
-- MC_INGEST_KEY_ID    (env) / --key-id        (CLI) : Monte Carlo ingestion key ID
-- MC_INGEST_KEY_TOKEN (env) / --key-token      (CLI) : Monte Carlo ingestion key token
-- MC_RESOURCE_UUID    (env) / --resource-uuid  (CLI) : MC resource UUID for this connection
+- MCD_INGEST_ID    (env) / --key-id        (CLI) : Monte Carlo ingestion key ID
+- MCD_INGEST_TOKEN (env) / --key-token      (CLI) : Monte Carlo ingestion key token
+- MCD_RESOURCE_UUID    (env) / --resource-uuid  (CLI) : MC resource UUID for this connection
 
 Prerequisites
 -------------
@@ -22,9 +22,9 @@ Prerequisites
 Usage
 -----
     python push_metadata.py \\
-        --key-id  <MC_INGEST_KEY_ID> \\
-        --key-token <MC_INGEST_KEY_TOKEN> \\
-        --resource-uuid <MC_RESOURCE_UUID> \\
+        --key-id  <MCD_INGEST_ID> \\
+        --key-token <MCD_INGEST_TOKEN> \\
+        --resource-uuid <MCD_RESOURCE_UUID> \\
         --input-file metadata_output.json
 """
 
@@ -181,19 +181,19 @@ def main() -> None:
     )
     parser.add_argument(
         "--key-id",
-        default=os.environ.get("MC_INGEST_KEY_ID"),
-        help="Monte Carlo ingestion key ID (env: MC_INGEST_KEY_ID)",  # ← SUBSTITUTE env var name if different
+        default=os.environ.get("MCD_INGEST_ID"),
+        help="Monte Carlo ingestion key ID (env: MCD_INGEST_ID)",  # ← SUBSTITUTE env var name if different
     )
     parser.add_argument(
         "--key-token",
-        default=os.environ.get("MC_INGEST_KEY_TOKEN"),
-        help="Monte Carlo ingestion key token (env: MC_INGEST_KEY_TOKEN)",  # ← SUBSTITUTE env var name if different
+        default=os.environ.get("MCD_INGEST_TOKEN"),
+        help="Monte Carlo ingestion key token (env: MCD_INGEST_TOKEN)",  # ← SUBSTITUTE env var name if different
     )
     parser.add_argument(
         "--resource-uuid",
-        default=os.environ.get("MC_RESOURCE_UUID"),
+        default=os.environ.get("MCD_RESOURCE_UUID"),
         required=False,
-        help="Monte Carlo resource UUID for this Hive connection (env: MC_RESOURCE_UUID)",
+        help="Monte Carlo resource UUID for this Hive connection (env: MCD_RESOURCE_UUID)",
     )
     parser.add_argument(
         "--input-file",
@@ -217,9 +217,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.key_id or not args.key_token:
-        parser.error("--key-id and --key-token are required (or set MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN)")
+        parser.error("--key-id and --key-token are required (or set MCD_INGEST_ID / MCD_INGEST_TOKEN)")
     if not args.resource_uuid:
-        parser.error("--resource-uuid is required (or set MC_RESOURCE_UUID)")
+        parser.error("--resource-uuid is required (or set MCD_RESOURCE_UUID)")
 
     with open(args.input_file) as fh:
         manifest = json.load(fh)

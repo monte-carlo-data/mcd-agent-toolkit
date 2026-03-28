@@ -12,8 +12,8 @@ Substitution points (search for "← SUBSTITUTE"):
   - DATABRICKS_HTTP_PATH  : SQL warehouse HTTP path
   - DATABRICKS_TOKEN      : PAT or service-principal secret
   - LOOKBACK_DAYS         : how many days back to collect lineage (default 30)
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
   - PUSH_BATCH_SIZE       : number of events per API call (default 500)
 
 Use the --column-lineage flag to also push column-level lineage (disabled by default).
@@ -40,9 +40,9 @@ def main() -> None:
     parser.add_argument("--host", default=os.getenv("DATABRICKS_HOST"))           # ← SUBSTITUTE
     parser.add_argument("--http-path", default=os.getenv("DATABRICKS_HTTP_PATH")) # ← SUBSTITUTE
     parser.add_argument("--token", default=os.getenv("DATABRICKS_TOKEN"))         # ← SUBSTITUTE
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--lookback-days", type=int, default=LOOKBACK_DAYS)
     parser.add_argument(
         "--column-lineage", action="store_true",

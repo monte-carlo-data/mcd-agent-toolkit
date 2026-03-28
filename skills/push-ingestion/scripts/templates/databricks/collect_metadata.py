@@ -109,7 +109,7 @@ def collect(
                 fields = [
                     {
                         "name": col["column_name"],
-                        "field_type": col["data_type"].upper(),
+                        "type": col["data_type"].upper(),
                         "description": col.get("comment") or None,
                     }
                     for col in columns
@@ -134,7 +134,7 @@ def collect(
                     "asset_name": table_name,
                     "database": catalog,    # ← SUBSTITUTE: use catalog as database
                     "schema": schema,
-                    "asset_type": row.get("table_type", "TABLE"),
+                    "asset_type": "VIEW" if row.get("table_type", "").upper() == "VIEW" else "TABLE",
                     "description": row.get("comment") or None,
                     "fields": fields,
                     "row_count": row_count,

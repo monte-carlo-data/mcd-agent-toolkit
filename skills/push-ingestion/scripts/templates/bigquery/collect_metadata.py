@@ -94,7 +94,7 @@ def _collect_assets(bq_client: bigquery.Client, project_id: str) -> list[dict]:
                 "name": table.table_id,
                 "database": project_id,  # ← SUBSTITUTE: use project or dataset as database
                 "schema": dataset_id,
-                "type": "TABLE" if table.table_type == "TABLE" else table.table_type,
+                "type": "VIEW" if table.table_type == "VIEW" else "TABLE",
                 "description": table.description or None,
                 "fields": fields,
                 "volume": {

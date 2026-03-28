@@ -8,8 +8,8 @@ into batches to stay under the 1 MB compressed limit.
 Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
 
 Prerequisites:
   pip install pycarlo
@@ -48,7 +48,7 @@ def _asset_from_dict(d: dict) -> RelationalAsset:
     fields = [
         AssetField(
             name=f["name"],
-            field_type=f.get("type"),
+            type=f.get("type"),
             description=f.get("description"),
         )
         for f in d.get("fields", [])
@@ -64,16 +64,18 @@ def _asset_from_dict(d: dict) -> RelationalAsset:
     freshness = None
     if d.get("freshness"):
         freshness = AssetFreshness(
-            last_updated_time=d["freshness"].get("last_updated_time"),
+            last_update_time=d["freshness"].get("last_update_time"),
         )
 
     return RelationalAsset(
-        asset_name=d["name"],
-        database=d["database"],  # ← SUBSTITUTE: use project or dataset as database
-        schema=d["schema"],
-        asset_type=d.get("type", "TABLE"),
-        description=d.get("description"),
-        metadata=AssetMetadata(fields=fields),
+        type=d.get("type", "TABLE"),
+        metadata=AssetMetadata(
+            name=d["name"],
+            database=d["database"],  # ← SUBSTITUTE: use project or dataset as database
+            schema=d["schema"],
+            description=d.get("description"),
+        ),
+        fields=fields,
         volume=volume,
         freshness=freshness,
     )
@@ -111,10 +113,10 @@ def push(
         batch_num = i // batch_size + 1
         log.info("Pushing batch %d/%d (%d assets) ...", batch_num, total_batches, len(batch))
 
-        result = service.push_custom_assets(
+        result = service.send_metadata(
             resource_uuid=resource_uuid,
             resource_type=resource_type,
-            assets=batch,
+            events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
         invocation_ids.append(invocation_id)
@@ -141,9 +143,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Push BigQuery metadata from a manifest to Monte Carlo",
     )
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--input-file", default="metadata_output.json")
     parser.add_argument("--output-file", default="metadata_push_result.json")
     parser.add_argument(

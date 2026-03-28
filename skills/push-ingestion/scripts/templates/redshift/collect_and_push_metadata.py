@@ -14,8 +14,8 @@ Substitution points (search for "← SUBSTITUTE"):
   - REDSHIFT_PASSWORD : database password
   - DB_EXCLUSIONS     : databases to skip
   - SCHEMA_EXCLUSIONS : schemas to skip in every database
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID  : UUID of the Redshift connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID  : UUID of the Redshift connection in Monte Carlo
   - PUSH_BATCH_SIZE   : number of assets per API call (default 500)
 
 Prerequisites:
@@ -42,9 +42,9 @@ def main() -> None:
     parser.add_argument("--user", default=os.getenv("REDSHIFT_USER"))         # ← SUBSTITUTE
     parser.add_argument("--password", default=os.getenv("REDSHIFT_PASSWORD")) # ← SUBSTITUTE
     parser.add_argument("--port", type=int, default=int(os.getenv("REDSHIFT_PORT", "5439")))
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--manifest", default="manifest_metadata.json")
     args = parser.parse_args()

@@ -11,9 +11,9 @@ Substitution points
 - SNOWFLAKE_USER       (env) / --user       (CLI) : Snowflake username
 - SNOWFLAKE_PASSWORD   (env) / --password   (CLI) : Snowflake password
 - SNOWFLAKE_WAREHOUSE  (env) / --warehouse  (CLI) : Snowflake virtual warehouse
-- MC_INGEST_KEY_ID     (env) / --key-id     (CLI) : Monte Carlo ingestion key ID
-- MC_INGEST_KEY_TOKEN  (env) / --key-token  (CLI) : Monte Carlo ingestion key token
-- MC_RESOURCE_UUID     (env) / --resource-uuid (CLI) : MC resource UUID for this connection
+- MCD_INGEST_ID     (env) / --key-id     (CLI) : Monte Carlo ingestion key ID
+- MCD_INGEST_TOKEN  (env) / --key-token  (CLI) : Monte Carlo ingestion key token
+- MCD_RESOURCE_UUID     (env) / --resource-uuid (CLI) : MC resource UUID for this connection
 
 Prerequisites
 -------------
@@ -25,9 +25,9 @@ Usage (table-level):
         --user     <SNOWFLAKE_USER> \\
         --password <SNOWFLAKE_PASSWORD> \\
         --warehouse <SNOWFLAKE_WAREHOUSE> \\
-        --key-id  <MC_INGEST_KEY_ID> \\
-        --key-token <MC_INGEST_KEY_TOKEN> \\
-        --resource-uuid <MC_RESOURCE_UUID>
+        --key-id  <MCD_INGEST_ID> \\
+        --key-token <MCD_INGEST_TOKEN> \\
+        --resource-uuid <MCD_RESOURCE_UUID>
 
 Usage (column-level):
     python collect_and_push_lineage.py ... --column-lineage
@@ -68,18 +68,18 @@ def main() -> None:
     )
     parser.add_argument(
         "--key-id",
-        default=os.environ.get("MC_INGEST_KEY_ID"),
-        help="Monte Carlo ingestion key ID (env: MC_INGEST_KEY_ID)",
+        default=os.environ.get("MCD_INGEST_ID"),
+        help="Monte Carlo ingestion key ID (env: MCD_INGEST_ID)",
     )
     parser.add_argument(
         "--key-token",
-        default=os.environ.get("MC_INGEST_KEY_TOKEN"),
-        help="Monte Carlo ingestion key token (env: MC_INGEST_KEY_TOKEN)",
+        default=os.environ.get("MCD_INGEST_TOKEN"),
+        help="Monte Carlo ingestion key token (env: MCD_INGEST_TOKEN)",
     )
     parser.add_argument(
         "--resource-uuid",
-        default=os.environ.get("MC_RESOURCE_UUID"),
-        help="Monte Carlo resource UUID for this Snowflake connection (env: MC_RESOURCE_UUID)",
+        default=os.environ.get("MCD_RESOURCE_UUID"),
+        help="Monte Carlo resource UUID for this Snowflake connection (env: MCD_RESOURCE_UUID)",
     )
     parser.add_argument(
         "--lookback-hours",

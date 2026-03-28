@@ -8,8 +8,8 @@ are split into batches to stay under the 1 MB compressed limit.
 Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
 
 Prerequisites:
   pip install pycarlo
@@ -42,15 +42,19 @@ def _build_query_log_entries(queries: list[dict]) -> list[QueryLogEntry]:
     """Convert manifest query dicts into QueryLogEntry objects."""
     entries = []
     for q in queries:
+        extra = {}
+        if q.get("total_bytes_billed") is not None:
+            extra["total_bytes_billed"] = q["total_bytes_billed"]
+        if q.get("statement_type") is not None:
+            extra["statement_type"] = q["statement_type"]
+
         entry = QueryLogEntry(
             query_id=q.get("query_id"),
             query_text=q.get("query_text") or "",
             start_time=q.get("start_time"),
             end_time=q.get("end_time"),
             user=q.get("user"),
-            # Pass warehouse-specific extras as keyword arguments
-            total_bytes_billed=q.get("total_bytes_billed"),
-            statement_type=q.get("statement_type"),
+            extra=extra or None,
         )
         entries.append(entry)
     return entries
@@ -103,10 +107,10 @@ def push(
         batch_num = i // batch_size + 1
         log.info("Pushing batch %d/%d (%d entries) ...", batch_num, total_batches, len(batch))
 
-        result = service.push_custom_query_logs(
+        result = service.send_query_logs(
             resource_uuid=resource_uuid,
             log_type=log_type,
-            query_logs=batch,
+            events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
         invocation_ids.append(invocation_id)
@@ -133,9 +137,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Push BigQuery query logs from a manifest to Monte Carlo",
     )
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--input-file", default="query_logs_output.json")
     parser.add_argument("--output-file", default="query_logs_push_result.json")
     parser.add_argument(

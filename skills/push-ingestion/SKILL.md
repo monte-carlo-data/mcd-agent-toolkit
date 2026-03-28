@@ -29,6 +29,103 @@ Push data travels through the integration gateway → dedicated Kinesis streams 
 adapter/normalizer code → the same downstream systems that power the pull model. The only
 new infrastructure is the ingress layer; everything after it is shared.
 
+## MANDATORY — Always start from templates
+
+When generating any push-ingestion script, you MUST:
+
+1. **Read the corresponding template** before writing any code. Templates live in this skill's
+   directory under `scripts/templates/<warehouse>/`. To find them, glob for
+   `**/push-ingestion/scripts/templates/<warehouse>/*.py` — this works regardless of where the
+   skill is installed. Do NOT search from the current working directory alone.
+2. **Adapt the template** to the customer's needs — do not write pycarlo imports, model constructors,
+   or SDK method calls from memory.
+3. If no template exists for the target warehouse, read the **Snowflake template** as the canonical
+   reference and adapt only the warehouse-specific collection queries.
+
+Template files follow this naming pattern:
+- `collect_<flow>.py` — collection only (queries the warehouse, writes a JSON manifest)
+- `push_<flow>.py` — push only (reads the manifest, sends to Monte Carlo)
+- `collect_and_push_<flow>.py` — combined (imports from both, runs in sequence)
+
+**After running any push script**, you MUST surface the `invocation_id`(s) returned by the API
+to the user. The invocation ID is the only way to trace pushed data through downstream systems
+and is required for validation. Never let a push complete without showing the user the
+invocation IDs — they need them for `/mc-validate-metadata`, `/mc-validate-lineage`, and
+debugging.
+
+## Canonical pycarlo API — authoritative reference
+
+The following imports, classes, and method signatures are the **ONLY** correct pycarlo API for
+push ingestion. If your training data suggests different names, **it is wrong**. Use exactly
+what is listed here.
+
+### Imports and client setup
+
+```python
+from pycarlo.core import Client, Session
+from pycarlo.features.ingestion import IngestionService
+from pycarlo.features.ingestion.models import (
+    # Metadata
+    RelationalAsset, AssetMetadata, AssetField, AssetVolume, AssetFreshness, Tag,
+    # Lineage
+    LineageEvent, LineageAssetRef, ColumnLineageField, ColumnLineageSourceField,
+    # Query logs
+    QueryLogEntry,
+)
+
+client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+service = IngestionService(mc_client=client)
+```
+
+### Method signatures
+
+```python
+# Metadata
+service.send_metadata(resource_uuid=..., resource_type=..., events=[RelationalAsset(...)])
+
+# Lineage (table or column)
+service.send_lineage(resource_uuid=..., resource_type=..., events=[LineageEvent(...)])
+
+# Query logs — note: log_type, NOT resource_type
+service.send_query_logs(resource_uuid=..., log_type=..., events=[QueryLogEntry(...)])
+
+# Extract invocation ID from any response
+service.extract_invocation_id(result)
+```
+
+### RelationalAsset structure (nested, NOT flat)
+
+```python
+RelationalAsset(
+    type="TABLE",  # ONLY "TABLE" or "VIEW" (uppercase) — normalize warehouse-native values
+    metadata=AssetMetadata(
+        name="my_table",
+        database="analytics",
+        schema="public",
+        description="optional description",
+    ),
+    fields=[
+        AssetField(name="id", type="INTEGER", description=None),
+        AssetField(name="amount", type="DECIMAL(10,2)"),
+    ],
+    volume=AssetVolume(row_count=1000000, byte_count=111111111),  # optional
+    freshness=AssetFreshness(last_update_time="2026-03-12T14:30:00Z"),  # optional
+)
+```
+
+## Environment variable conventions
+
+All generated scripts MUST use these exact variable names. Do NOT invent alternatives like
+`MCD_KEY_ID`, `MC_TOKEN`, `MONTE_CARLO_KEY`, etc.
+
+| Variable | Purpose | Used by |
+|---|---|---|
+| `MCD_INGEST_ID` | Ingestion key ID (scope=Ingestion) | push scripts |
+| `MCD_INGEST_TOKEN` | Ingestion key secret | push scripts |
+| `MCD_ID` | GraphQL API key ID | verification scripts |
+| `MCD_TOKEN` | GraphQL API key secret | verification scripts |
+| `MCD_RESOURCE_UUID` | Warehouse resource UUID | all scripts |
+
 ## What this skill can build for you
 
 Tell Claude your warehouse or data platform and Monte Carlo resource UUID and this skill will
@@ -71,8 +168,8 @@ Both use the same `x-mcd-id` / `x-mcd-token` headers but point to different endp
 | Flow | pycarlo method | Push endpoint | Type field | Expiration |
 |---|---|---|---|---|
 | Table metadata | `send_metadata()` | `/ingest/v1/metadata` | `resource_type` (e.g. `"data-lake"`) | **Never expires** |
-| Table lineage | `send_lineage()` with `event_type=LINEAGE` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Never expires** |
-| Column lineage | `send_lineage()` with `event_type=COLUMN_LINEAGE` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Expires after 10 days** |
+| Table lineage | `send_lineage()` | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Never expires** |
+| Column lineage | `send_lineage()` (events include `fields`) | `/ingest/v1/lineage` | `resource_type` (same as metadata) | **Expires after 10 days** |
 | Query logs | `send_query_logs()` | `/ingest/v1/querylogs` | **`log_type`** (not `resource_type`!) | Same as pulled |
 | Custom lineage | GraphQL mutations | `api.getmontecarlo.com/graphql` | N/A — uses GraphQL API key | 7 days default; set `expireAt: "9999-12-31"` for permanent |
 
@@ -92,17 +189,20 @@ Ask Claude to build the script for your warehouse:
 
 > "Build me a metadata collection script for Snowflake. My MC resource UUID is `abc-123`."
 
-The script templates in `scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
-are **examples** that illustrate the collection and push pattern — how to query system catalogs,
-build pycarlo objects, and call the push API. **They are not an exhaustive list.** If the
+The script templates in `**/push-ingestion/scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
+are the **mandatory starting point** for script generation — they contain the correct pycarlo
+imports, model constructors, and SDK calls. **They are not an exhaustive list.** If the
 customer's warehouse is not listed, use the templates as a guide and determine the appropriate
 queries or file-collection approach for their platform. For file-based sources (like Hive
 Metastore logs), provide the command to retrieve the file, parse it, and transform it into the
 format required by the push APIs. The push format and SDK calls are identical regardless of
 source; only the collection queries change.
 
-**Batching**: For large payloads, split events into batches. The compressed request body must
-not exceed **1MB** (Kinesis limit). All push endpoints support batching.
+**Batching**: For large payloads, split events into batches. Use a batch size of **50 assets**
+per push call. The pycarlo HTTP client has a hardcoded 10-second read timeout that cannot be
+overridden (`Session` and `Client` do not accept a `timeout` parameter) — larger batches (200+)
+will timeout on warehouses with thousands of tables. The compressed request body must also not
+exceed **1MB** (Kinesis limit). All push endpoints support batching.
 
 **Push frequency**: Push at most **once per hour**. Sub-hourly pushes produce unpredictable
 anomaly detector behavior because the training pipeline aggregates into hourly buckets.
@@ -207,3 +307,44 @@ When pushed data isn't appearing, work through these five checkpoints in order:
   Split large event lists into batches.
 - **Column lineage expires after 10 days**: unlike table metadata and table lineage (which
   never expire), column lineage has a 10-day TTL, same as pulled column lineage.
+- **Quote SQL identifiers in warehouse queries**: database, schema, and table names must be
+  quoted to handle mixed-case or special characters. The quoting syntax varies by warehouse —
+  Snowflake and Redshift use double quotes (`"{db}"`), BigQuery/Databricks/Hive use backticks
+  (`` `db` ``). The templates already handle this correctly for each warehouse — follow the
+  same quoting pattern when adapting.
+
+## Memory safety
+
+Generated scripts must include a startup memory check. The collection phase loads query history
+rows into memory for parsing — on large warehouses with long lookback windows, this can exhaust
+available RAM and cause the process to be silently killed (SIGKILL / exit 137) with no traceback.
+
+Add this pattern near the top of every generated script, after imports:
+
+```python
+import os
+
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        print(
+            f"WARNING: Only {avail_gb:.1f} GB of memory available "
+            f"(minimum recommended: {min_gb:.1f} GB). "
+            f"Consider reducing the lookback window or increasing available memory."
+        )
+```
+
+Call `_check_available_memory()` before connecting to the warehouse.
+
+Additionally, when fetching query history:
+- Use `cursor.fetchmany(batch_size)` in a loop instead of `cursor.fetchall()` when possible
+- For very large result sets, consider adding a LIMIT clause and processing in windows

@@ -46,6 +46,26 @@ _SKIP_DATABASES = {"SNOWFLAKE", "SNOWFLAKE_SAMPLE_DATA"}
 _SKIP_SCHEMAS = {"INFORMATION_SCHEMA"}
 
 
+# Snowflake TABLE_TYPE → Monte Carlo RelationalAsset.type mapping.
+# The MC API only accepts "TABLE" or "VIEW" (uppercase).
+_TABLE_TYPE_MAP = {
+    "BASE TABLE": "TABLE",
+    "TABLE": "TABLE",
+    "DYNAMIC TABLE": "TABLE",
+    "EXTERNAL TABLE": "TABLE",
+    "VIEW": "VIEW",
+    "MATERIALIZED VIEW": "VIEW",
+    "SECURE VIEW": "VIEW",
+}
+
+
+def _normalize_table_type(raw_type: str | None) -> str:
+    """Map Snowflake's TABLE_TYPE value to MC-accepted 'TABLE' or 'VIEW'."""
+    if not raw_type:
+        return "TABLE"
+    return _TABLE_TYPE_MAP.get(raw_type.upper(), "TABLE")
+
+
 def _connect(account: str, user: str, password: str, warehouse: str):
     # ← SUBSTITUTE: add role= or authenticator= kwargs if your org requires them
     return snowflake.connector.connect(
@@ -160,7 +180,7 @@ def _collect_assets(conn) -> list[dict]:
 
             assets.append(
                 {
-                    "type": tbl_type or "TABLE",
+                    "type": _normalize_table_type(tbl_type),
                     "database": tbl_catalog,
                     "schema": tbl_schema,
                     "name": tbl_name,

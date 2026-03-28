@@ -6,8 +6,8 @@ log entries to Monte Carlo via the push ingestion API, with configurable batchin
 to keep compressed payloads under 1 MB.
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
   - PUSH_BATCH_SIZE       : number of entries per API call (default 250)
 
 Prerequisites:
@@ -36,6 +36,14 @@ DEFAULT_BATCH_SIZE = 250  # ← SUBSTITUTE: conservative default to stay under 1
 
 def _entry_from_dict(d: dict[str, Any]) -> QueryLogEntry:
     """Reconstruct a QueryLogEntry from a manifest dict."""
+    extra = {}
+    if d.get("total_task_duration_ms") is not None:
+        extra["total_task_duration_ms"] = d["total_task_duration_ms"]
+    if d.get("read_rows") is not None:
+        extra["read_rows"] = d["read_rows"]
+    if d.get("read_bytes") is not None:
+        extra["read_bytes"] = d["read_bytes"]
+
     return QueryLogEntry(
         query_id=d.get("query_id"),
         query_text=d.get("query_text", ""),
@@ -43,9 +51,7 @@ def _entry_from_dict(d: dict[str, Any]) -> QueryLogEntry:
         end_time=d.get("end_time"),
         user=d.get("user"),
         returned_rows=d.get("returned_rows"),
-        total_task_duration_ms=d.get("total_task_duration_ms"),
-        read_rows=d.get("read_rows"),
-        read_bytes=d.get("read_bytes"),
+        extra=extra or None,
     )
 
 
@@ -76,10 +82,10 @@ def push(
     for i in range(0, len(entries), batch_size):
         batch = entries[i : i + batch_size]
         log.info("Pushing batch %d–%d of %d entries …", i, i + len(batch), len(entries))
-        result = service.push_custom_query_logs(
+        result = service.send_query_logs(
             resource_uuid=resource_uuid,
             log_type=LOG_TYPE,
-            query_logs=batch,
+            events=batch,
         )
         inv_id = service.extract_invocation_id(result)
         invocation_ids.append(inv_id)
@@ -107,9 +113,9 @@ def push(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push Databricks query logs to Monte Carlo from manifest")
     parser.add_argument("--manifest", default="manifest_query_logs.json")
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 

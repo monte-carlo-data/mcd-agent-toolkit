@@ -47,6 +47,25 @@ import snowflake.connector
 # ← SUBSTITUTE: set RESOURCE_TYPE to match your Monte Carlo connection type
 RESOURCE_TYPE = "snowflake"
 
+
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        print(
+            f"WARNING: Only {avail_gb:.1f} GB of memory available "
+            f"(minimum recommended: {min_gb:.1f} GB). "
+            f"Consider reducing the lookback window or increasing available memory."
+        )
+
 # Hours to look back in ACCOUNT_USAGE.QUERY_HISTORY
 # ← SUBSTITUTE: adjust the lookback window to match your collection cadence
 _LOOKBACK_HOURS = 24
@@ -175,7 +194,12 @@ def _fetch_query_history(conn, lookback_hours: int) -> list[dict]:
         # ← SUBSTITUTE: adjust QUERY_TYPE list or add a WHERE clause to scope to specific databases
     )
     columns = [col[0] for col in cursor.description]
-    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    rows = []
+    while True:
+        batch = cursor.fetchmany(1000)
+        if not batch:
+            break
+        rows.extend(dict(zip(columns, row)) for row in batch)
     cursor.close()
     return rows
 
@@ -194,6 +218,7 @@ def collect(
 
     Returns the manifest dict.
     """
+    _check_available_memory()
     print(f"Connecting to Snowflake account: {account} ...")
     conn = snowflake.connector.connect(
         account=account,

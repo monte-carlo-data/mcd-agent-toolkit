@@ -6,8 +6,8 @@ events to Monte Carlo via the push ingestion API, with configurable batching to
 keep compressed payloads under 1 MB.
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the Redshift connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the Redshift connection in Monte Carlo
   - PUSH_BATCH_SIZE       : number of events per API call (default 500)
 
 Prerequisites:
@@ -39,10 +39,10 @@ DEFAULT_BATCH_SIZE = 500  # ← SUBSTITUTE: conservative default to stay under 1
 
 def _ref_from_dict(d: dict[str, Any]) -> LineageAssetRef:
     return LineageAssetRef(
+        type="TABLE",
+        name=d["asset_name"],
         database=d.get("database", ""),
         schema=d.get("schema", ""),
-        asset_name=d["asset_name"],
-        resource_type=RESOURCE_TYPE,
     )
 
 
@@ -83,7 +83,7 @@ def push(
     for i in range(0, len(events), batch_size):
         batch = events[i : i + batch_size]
         log.info("Pushing batch %d–%d of %d events …", i, i + len(batch), len(events))
-        result = service.push_custom_lineage(
+        result = service.send_lineage(
             resource_uuid=resource_uuid,
             resource_type=RESOURCE_TYPE,
             events=batch,
@@ -114,9 +114,9 @@ def push(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push Redshift lineage to Monte Carlo from manifest")
     parser.add_argument("--manifest", default="manifest_lineage.json")
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 

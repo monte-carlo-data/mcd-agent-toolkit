@@ -52,7 +52,8 @@ result = service.send_query_logs(
     log_type="snowflake",   # ← warehouse-specific! see table below
     entries=entries,
 )
-print("invocation_id:", result.invocation_id)
+invocation_id = service.extract_invocation_id(result)
+print("invocation_id:", invocation_id)
 ```
 
 ## log_type per warehouse
@@ -197,7 +198,7 @@ Parse the HiveServer2 log file (default: `/tmp/root/hive.log`) for lines matchin
 ```python
 manifest = {
     "resource_uuid": resource_uuid,
-    "invocation_id": result.invocation_id,   # ← save this
+    "invocation_id": service.extract_invocation_id(result),   # ← save this
     "collected_at": datetime.now(tz=timezone.utc).isoformat(),
     "entry_count": len(entries),
     "window_start": min(e.start_time for e in entries).isoformat(),

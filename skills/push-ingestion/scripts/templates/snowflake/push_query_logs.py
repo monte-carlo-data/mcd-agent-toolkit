@@ -10,9 +10,9 @@ Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points
 -------------------
-- MC_INGEST_KEY_ID     (env) / --key-id     (CLI) : Monte Carlo ingestion key ID
-- MC_INGEST_KEY_TOKEN  (env) / --key-token  (CLI) : Monte Carlo ingestion key token
-- MC_RESOURCE_UUID     (env) / --resource-uuid (CLI) : MC resource UUID for this connection
+- MCD_INGEST_ID     (env) / --key-id     (CLI) : Monte Carlo ingestion key ID
+- MCD_INGEST_TOKEN  (env) / --key-token  (CLI) : Monte Carlo ingestion key token
+- MCD_RESOURCE_UUID     (env) / --resource-uuid (CLI) : MC resource UUID for this connection
 
 Prerequisites
 -------------
@@ -21,9 +21,9 @@ Prerequisites
 Usage
 -----
     python push_query_logs.py \\
-        --key-id  <MC_INGEST_KEY_ID> \\
-        --key-token <MC_INGEST_KEY_TOKEN> \\
-        --resource-uuid <MC_RESOURCE_UUID> \\
+        --key-id  <MCD_INGEST_ID> \\
+        --key-token <MCD_INGEST_TOKEN> \\
+        --resource-uuid <MCD_RESOURCE_UUID> \\
         --input-file query_logs_output.json
 """
 
@@ -58,6 +58,12 @@ def _build_query_log_entries(queries: list[dict]) -> list[QueryLogEntry]:
         bytes_scanned = q.get("bytes_scanned")
         rows_produced = q.get("rows_produced")
 
+        extra = {}
+        if warehouse_name is not None:
+            extra["warehouse_name"] = warehouse_name
+        if bytes_scanned is not None:
+            extra["bytes_scanned"] = int(bytes_scanned)
+
         entries.append(
             QueryLogEntry(
                 start_time=start_time,
@@ -66,9 +72,7 @@ def _build_query_log_entries(queries: list[dict]) -> list[QueryLogEntry]:
                 query_id=query_id,
                 user=user_name,
                 returned_rows=int(rows_produced) if rows_produced is not None else None,
-                # Pass warehouse and bytes_scanned as extra kwargs for MC enrichment
-                warehouse_name=warehouse_name,
-                bytes_scanned=int(bytes_scanned) if bytes_scanned is not None else None,
+                extra=extra or None,
             )
         )
     return entries
@@ -154,18 +158,18 @@ def main() -> None:
     )
     parser.add_argument(
         "--key-id",
-        default=os.environ.get("MC_INGEST_KEY_ID"),
-        help="Monte Carlo ingestion key ID (env: MC_INGEST_KEY_ID)",
+        default=os.environ.get("MCD_INGEST_ID"),
+        help="Monte Carlo ingestion key ID (env: MCD_INGEST_ID)",
     )
     parser.add_argument(
         "--key-token",
-        default=os.environ.get("MC_INGEST_KEY_TOKEN"),
-        help="Monte Carlo ingestion key token (env: MC_INGEST_KEY_TOKEN)",
+        default=os.environ.get("MCD_INGEST_TOKEN"),
+        help="Monte Carlo ingestion key token (env: MCD_INGEST_TOKEN)",
     )
     parser.add_argument(
         "--resource-uuid",
-        default=os.environ.get("MC_RESOURCE_UUID"),
-        help="Monte Carlo resource UUID for this Snowflake connection (env: MC_RESOURCE_UUID)",
+        default=os.environ.get("MCD_RESOURCE_UUID"),
+        help="Monte Carlo resource UUID for this Snowflake connection (env: MCD_RESOURCE_UUID)",
     )
     parser.add_argument(
         "--input-file",

@@ -8,8 +8,8 @@ Substitution points (search for "← SUBSTITUTE"):
   - BIGQUERY_PROJECT_ID   : GCP project ID to collect query logs from
   - GOOGLE_APPLICATION_CREDENTIALS : path to service-account JSON key file
   - LOOKBACK_HOURS        : how many hours back to collect (default 25, skip last 1 h)
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
 
 Prerequisites:
   pip install google-cloud-bigquery pycarlo
@@ -27,9 +27,9 @@ from push_query_logs import push, _BATCH_SIZE
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push BigQuery query logs to Monte Carlo")
     parser.add_argument("--project-id", default=os.getenv("BIGQUERY_PROJECT_ID"))  # ← SUBSTITUTE
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--lookback-hours", type=int, default=LOOKBACK_HOURS)
     parser.add_argument("--lookback-lag-hours", type=int, default=LOOKBACK_LAG_HOURS)
     parser.add_argument("--output-file", default="query_logs_output.json")

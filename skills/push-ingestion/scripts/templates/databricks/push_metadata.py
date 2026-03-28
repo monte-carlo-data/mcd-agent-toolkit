@@ -6,8 +6,8 @@ to Monte Carlo via the push ingestion API, with configurable batching to keep
 compressed payloads under 1 MB.
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
   - PUSH_BATCH_SIZE       : number of assets per API call (default 500)
 
 Prerequisites:
@@ -45,20 +45,31 @@ def _asset_from_dict(d: dict[str, Any]) -> RelationalAsset:
     fields = [
         AssetField(
             name=f["name"],
-            field_type=f["field_type"],
+            type=f.get("type"),
             description=f.get("description"),
         )
         for f in d.get("fields", [])
     ]
+
+    volume = None
+    if d.get("row_count") is not None or d.get("byte_count") is not None:
+        volume = AssetVolume(row_count=d.get("row_count"), byte_count=d.get("byte_count"))
+
+    freshness = None
+    if d.get("last_updated") is not None:
+        freshness = AssetFreshness(last_update_time=d.get("last_updated"))
+
     return RelationalAsset(
-        asset_name=d["asset_name"],
-        database=d["database"],    # ← SUBSTITUTE: use catalog as database
-        schema=d["schema"],
-        asset_type=d.get("asset_type", "TABLE"),
-        description=d.get("description"),
-        metadata=AssetMetadata(fields=fields),
-        volume=AssetVolume(row_count=d.get("row_count"), byte_count=d.get("byte_count")),
-        freshness=AssetFreshness(last_updated_time=d.get("last_updated")),
+        type=d.get("asset_type", "TABLE"),
+        metadata=AssetMetadata(
+            name=d["asset_name"],
+            database=d["database"],    # ← SUBSTITUTE: use catalog as database
+            schema=d["schema"],
+            description=d.get("description"),
+        ),
+        fields=fields,
+        volume=volume,
+        freshness=freshness,
     )
 
 
@@ -89,10 +100,10 @@ def push(
     for i in range(0, len(assets), batch_size):
         batch = assets[i : i + batch_size]
         log.info("Pushing batch %d–%d of %d assets …", i, i + len(batch), len(assets))
-        result = service.push_custom_assets(
+        result = service.send_metadata(
             resource_uuid=resource_uuid,
             resource_type=RESOURCE_TYPE,
-            assets=batch,
+            events=batch,
         )
         inv_id = service.extract_invocation_id(result)
         invocation_ids.append(inv_id)
@@ -120,9 +131,9 @@ def push(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push Databricks metadata to Monte Carlo from manifest")
     parser.add_argument("--manifest", default="manifest_metadata.json")
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 

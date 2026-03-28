@@ -9,9 +9,9 @@ Thin wrapper that calls ``collect()`` from ``collect_query_logs`` followed by
 
 Substitution points
 -------------------
-- MC_INGEST_KEY_ID    (env) / --key-id        (CLI) : Monte Carlo ingestion key ID
-- MC_INGEST_KEY_TOKEN (env) / --key-token      (CLI) : Monte Carlo ingestion key token
-- MC_RESOURCE_UUID    (env) / --resource-uuid  (CLI) : MC resource UUID (optional for query logs)
+- MCD_INGEST_ID    (env) / --key-id        (CLI) : Monte Carlo ingestion key ID
+- MCD_INGEST_TOKEN (env) / --key-token      (CLI) : Monte Carlo ingestion key token
+- MCD_RESOURCE_UUID    (env) / --resource-uuid  (CLI) : MC resource UUID (optional for query logs)
 - --log-file                  path to local HiveServer2 log (default: /tmp/root/hive.log)
 - --op-logs-dir               optional directory of per-query <queryId>.log files
 
@@ -22,9 +22,9 @@ Prerequisites
 Usage
 -----
     python collect_and_push_query_logs.py \\
-        --key-id  <MC_INGEST_KEY_ID> \\
-        --key-token <MC_INGEST_KEY_TOKEN> \\
-        --resource-uuid <MC_RESOURCE_UUID> \\
+        --key-id  <MCD_INGEST_ID> \\
+        --key-token <MCD_INGEST_TOKEN> \\
+        --resource-uuid <MCD_RESOURCE_UUID> \\
         --log-file /tmp/root/hive.log \\
         [--op-logs-dir /var/log/hive/operation_logs]
 """
@@ -59,18 +59,18 @@ def main() -> None:
     # Push / MC args
     parser.add_argument(
         "--key-id",
-        default=os.environ.get("MC_INGEST_KEY_ID"),
-        help="Monte Carlo ingestion key ID (env: MC_INGEST_KEY_ID)",
+        default=os.environ.get("MCD_INGEST_ID"),
+        help="Monte Carlo ingestion key ID (env: MCD_INGEST_ID)",
     )
     parser.add_argument(
         "--key-token",
-        default=os.environ.get("MC_INGEST_KEY_TOKEN"),
-        help="Monte Carlo ingestion key token (env: MC_INGEST_KEY_TOKEN)",
+        default=os.environ.get("MCD_INGEST_TOKEN"),
+        help="Monte Carlo ingestion key token (env: MCD_INGEST_TOKEN)",
     )
     parser.add_argument(
         "--resource-uuid",
-        default=os.environ.get("MC_RESOURCE_UUID"),
-        help="Monte Carlo resource UUID (optional for query logs) (env: MC_RESOURCE_UUID)",
+        default=os.environ.get("MCD_RESOURCE_UUID"),
+        help="Monte Carlo resource UUID (optional for query logs) (env: MCD_RESOURCE_UUID)",
     )
     parser.add_argument(
         "--output-file",
@@ -94,7 +94,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.key_id or not args.key_token:
-        parser.error("--key-id and --key-token are required (or set MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN)")
+        parser.error("--key-id and --key-token are required (or set MCD_INGEST_ID / MCD_INGEST_TOKEN)")
 
     manifest = collect(log_file=args.log_file, op_logs_dir=args.op_logs_dir)
 
