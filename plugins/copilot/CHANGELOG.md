@@ -5,7 +5,7 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.21.1] - 2026-07-23
+## [1.22.1] - 2026-07-26
 
 ### Fixed
 
@@ -14,6 +14,12 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the Cortex, Genie, customer-OTel, and MLflow backends. Backend guides, alert
   playbooks, direct-trace intake, and the tool tables now route span-grain drill-down
   on those backends through `run_troubleshooting_agent` (AI-710).
+
+## [1.22.0] - 2026-07-22
+
+### Added
+
+- reinforce-agent: new skill that turns an AI agent's Monte Carlo agent-health diagnosis into code fixes — ranks diagnosed issues per workflow via `get_agent_health_summaries`, deep-dives a user-chosen workflow via `get_agent_health`, proposes fixes, and opens a PR. User-gated at each fan-out (which workflow, which issue, and before pushing).
 
 ## [1.21.0] - 2026-07-22
 

@@ -20,6 +20,7 @@ List all available Monte Carlo skills and workflows. Present them grouped by cat
 | `/monitoring-advisor` | Analyze data coverage, identify gaps, and create monitors for warehouse tables and AI agents |
 | `/instrument-agent` | Instrument a new AI agent in a Python codebase for Monte Carlo Agent Observability — detect libraries, install the OpenTelemetry SDK, propose `mc.setup()` and decorator diffs |
 | `/monte-carlo-troubleshoot-agent-traces` | Investigate AI agent alerts (evaluation, metric, trajectory, validation) and agent traces — kicks off the trace troubleshooting agent and guides a backend-aware manual investigation |
+| `/monte-carlo-reinforce-agent` | Turn an AI agent's Monte Carlo health diagnosis into code fixes — rank the diagnosed issues per workflow, propose what to fix, and open a PR (user-gated at each step) |
 | `/mc-validate` | Generate and run validation queries for dbt model changes |
 | `/mc-build-*` | Push ingestion commands — build metadata, lineage, and query log collectors |
 

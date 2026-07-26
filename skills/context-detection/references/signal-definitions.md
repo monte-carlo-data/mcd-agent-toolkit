@@ -26,6 +26,7 @@ workflow to the routing system.
 | Push ingestion | "push ingestion", "metadata collector", "lineage collector" | push-ingestion (direct) |
 | Agent instrumentation | "instrument my agent", "instrument", "set up tracing", "set up Monte Carlo tracing", "setting up an agent", "add MC tracing" | instrument-agent (direct) |
 | Agent alert / trace investigation | "agent alert", "eval score drop", "agent trace", "agent conversation", "why is my agent failing" | troubleshoot-agent-traces (direct) |
+| Agent reinforcement / fix | "fix my agent", "reinforce my agent", "improve my agent's health", "what should I fix in my agent", "open a PR for my agent" | reinforce-agent (direct) |
 
 ## API Signals (detected via scoped MCP tool calls)
 
