@@ -91,7 +91,8 @@ grain.
    names the failure mode outright — when it already explains the regression, capture it
    and stop drilling.
 6. **Read the actual items.** `get_agent_conversation` per conversation (conversation
-   grain) or `get_agent_trace` per trace (trace grain). Read the breaching items AND a
+   grain) or `get_agent_trace` per trace (trace grain; managed-store (`ao_clickhouse_otel`)
+   agents only — on other backends it errors, see the backend guide). Read the breaching items AND a
    few healthy items from before the breach began — the comparison is what isolates what
    changed. Note: raw content (prompts, completions, transcripts) is gated on the
    account's data-sampling consent; without it, reason from structure (span taxonomy,

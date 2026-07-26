@@ -53,7 +53,9 @@ the rule looks back **about one hour** from each run, not a whole day.
    assertion's signal — error status, span name, workflow/task, token or duration
    thresholds — over the window ending at the alert's timestamp (default lookback about
    one hour). Anchor to the alert's own time, not to "now".
-5. **Identify the span-level cause.** `get_agent_trace` per offending trace:
+5. **Identify the span-level cause.** `get_agent_trace` per offending trace
+   (managed-store (`ao_clickhouse_otel`) agents only — on other backends it errors;
+   get span-grain detail from `run_troubleshooting_agent`, per the backend guide):
    - Hard failure: locate the failed spans in the tree; in a cascade of failures the
      root cause is usually the **earliest or innermost** failing span.
    - Content assertion: read what the breaching spans' outputs actually contain that

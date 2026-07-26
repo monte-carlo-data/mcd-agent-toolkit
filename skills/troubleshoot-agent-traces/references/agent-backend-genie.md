@@ -14,8 +14,9 @@ findings.**
 ## Signal available here
 
 - **Turn-grain records** shaped as a shallow two-level tree: a root turn span (the NL
-  question and the answer) with one child per generated SQL statement. `get_agent_trace`
-  shows this shape — it is the whole story for a turn.
+  question and the answer) with one child per generated SQL statement — the whole story
+  for a turn. Read turns through the conversation tools (`get_agent_trace` does not
+  read this backend — it is a managed-store-only tool and errors here).
 - **Native conversation grouping** — every span carries a real conversation id;
   `get_agent_conversations` / `get_agent_conversation` reconstruct multi-turn threads.
   **Conversation-grain evaluation monitors** run on this backend, so a breached eval

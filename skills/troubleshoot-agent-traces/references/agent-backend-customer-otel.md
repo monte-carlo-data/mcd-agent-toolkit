@@ -4,10 +4,12 @@
 
 A **customer-owned Snowflake table** holding raw OpenTelemetry export from a
 code agent the customer instrumented themselves. Monte Carlo normalizes it to the same
-standard span vocabulary as the managed OTel store, so the standard reads
-(`get_agent_traces`, `get_agent_trace`, conversations, segments) all work the same way.
-Investigation shape is essentially the managed-OTel playbook — what differs is where the
-data lives and who feeds it.
+standard span vocabulary as the managed OTel store, so the standard list/aggregate reads
+(`get_agent_traces`, conversations, segments) all work the same way. The exception is
+`get_agent_trace`: the single-trace span-tree read resolves only against the Monte
+Carlo–managed OTel store, so it errors on this backend — span-grain depth comes from
+`run_troubleshooting_agent` instead. Investigation shape is essentially the managed-OTel
+playbook — what differs is where the data lives and who feeds it.
 
 **CRITICAL: the trace table is the customer's — ingestion gaps on their side (a stalled
 export job, missing hours, a frozen latest-timestamp) can masquerade as agent
@@ -16,7 +18,10 @@ regressions. Rule out a feed gap before calling anything an agent problem.**
 ## Signal available here
 
 - **Full, real span tree** with parent/child structure, timing, and error detail
-  (including exception type/message) — via `get_agent_trace`.
+  (including exception type/message) — captured in the normalized data. There is no
+  direct MCP span-tree read here (`get_agent_trace` is managed-store-only): span-grain
+  drill-down goes through `run_troubleshooting_agent`, which queries the trace table
+  server-side.
 - **Model per span and token counts** — model-swap, cost, and context-overflow questions
   have answers.
 - **Workflow / task / model segmentation** — `get_agent_segments`, `get_agent_traces`.
@@ -27,8 +32,9 @@ regressions. Rule out a feed gap before calling anything an agent problem.**
 
 ## Absent by design — do not chase
 
-- **Nothing structural vs the managed OTel store** — the normalized vocabulary is the
-  same; the difference is the store, not the signal.
+- **Nothing structural vs the managed OTel store in the data** — the normalized
+  vocabulary is the same; the difference is the store, not the signal. (Tooling does
+  differ in one way: `get_agent_trace` reads only the managed store — see above.)
 - **Conversation-grain eval breaches and conversation clustering** exist only on the
   Monte Carlo–managed store and the Cortex/Genie platform backends — eval alerts here
   resolve at trace/span grain.
@@ -47,8 +53,11 @@ regressions. Rule out a feed gap before calling anything an agent problem.**
    decide step vs drift.
 4. **Classify errors before hypothesizing** — provider rejection, timeout, fast-fail,
    parse failure, code exception, slow-but-healthy.
-5. **On a known-bad trace**, list its failed spans in order with `get_agent_trace`; the
-   root cause is usually the earliest or innermost failure. Read the actual error text.
+5. **On a known-bad trace**, get the failed-spans-in-order view from the automated run
+   (`run_troubleshooting_agent` — `get_agent_trace` errors on this backend); the root
+   cause is usually the earliest or innermost failure. Read the actual error text.
+   Manual MCP reads stop at trace grain (`get_agent_traces` — per-trace status and
+   error counts).
 6. **Compare content across cohorts** when the account's data-sampling settings allow —
    breaching vs pre-onset.
 7. **Correlate with changes** — PRs merged before the onset (wide margins for deploy

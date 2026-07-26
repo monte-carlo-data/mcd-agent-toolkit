@@ -48,10 +48,13 @@ No matching alert — manual investigation, strictly scoped to what the user bro
 - **`trace_id`** → `get_agent_trace`: read the span tree. Failed spans first — in a
   cascade of failures the root cause is usually the earliest or innermost failing span.
   Then timing (where the duration goes), token counts per span, and the model on each
-  LLM span.
+  LLM span. (Managed-store (`ao_clickhouse_otel`) agents only — on other backends
+  `get_agent_trace` errors; work from `get_agent_traces` — per-trace status, error
+  counts, tokens, duration — and the conversation reads. This path has no automated
+  run to lean on.)
 - **`conversation_id`** → `get_agent_conversation`: read the thread turn by turn, find
   the turn where things went wrong, then `get_agent_trace` on that turn's trace for the
-  span-level view.
+  span-level view (managed-store agents only — see above).
 - **Description only** → `get_agent_traces` filtered by the described symptom (errors,
   latency, the time window the user gives) to find candidate traces first, then drill
   in as above.

@@ -60,8 +60,10 @@ decision path changed.
    > now".
 
 6. **Diff violating vs compliant.** `get_agent_trace` on candidate violating traces AND
-   on a compliant trace from the same workflow. Answer concretely: WHICH expected span
-   is missing, out of order, or repeated too many/few times?
+   on a compliant trace from the same workflow (managed-store (`ao_clickhouse_otel`)
+   agents only — on other backends it errors; get the span-shape view from
+   `run_troubleshooting_agent`, per the backend guide). Answer concretely: WHICH
+   expected span is missing, out of order, or repeated too many/few times?
 7. **Commonality and onset.** What do the violating traces share (workflow, task, input
    kind, user) that compliant traces don't? Since WHEN do violations appear — compare
    against earlier traces of the same workflow to date the onset.

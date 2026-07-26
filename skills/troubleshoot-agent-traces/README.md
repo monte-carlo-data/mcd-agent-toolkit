@@ -23,7 +23,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `alert_assessment` | Optional ~2-min triage of an alert (HIGH/MEDIUM/LOW confidence + impact) |
 | `get_agent_metadata` | List AI agents — names, trace tables, backend classes, source types, warehouses |
 | `get_agent_traces` | List traces with workflows, tasks, models, tokens, duration, error counts |
-| `get_agent_trace` | Inspect one execution trace's full span tree |
+| `get_agent_trace` | Inspect one execution trace's full span tree (managed OTel store agents only — errors on other backends) |
 | `get_agent_conversations` | List recent conversations for an agent (filterable) |
 | `get_agent_conversation` | One conversation's full prompt/completion thread |
 | `get_agent_segments` | Distinct workflow / task / model values for segment isolation |

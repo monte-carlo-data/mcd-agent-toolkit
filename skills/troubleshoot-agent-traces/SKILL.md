@@ -70,7 +70,7 @@ The Step 2 gate uses the `get_alert_agent_classification` tool. If that tool is 
 |------|---------|
 | `get_agent_metadata` | List AI agents — names, trace tables, backend classes, source types, warehouses |
 | `get_agent_traces` | List traces with per-trace workflows, tasks, models, LLM-call counts, tokens, duration, and error counts |
-| `get_agent_trace` | Inspect one execution trace's full span tree |
+| `get_agent_trace` | Inspect one execution trace's full span tree — **managed OTel store (`ao_clickhouse_otel`) agents only**; on other backends the call errors. Span-grain depth there comes from `run_troubleshooting_agent`; manual reads stop at trace grain (`get_agent_traces`) |
 | `get_agent_conversations` | List recent conversations for an agent (filter by errors/status/turns/tokens/duration; optional inline transcripts) |
 | `get_agent_conversation` | Retrieve one conversation's full prompt/completion thread |
 | `get_agent_segments` | Enumerate the distinct `workflow` / `task` / `model` values — the segment axes for isolating a regression |

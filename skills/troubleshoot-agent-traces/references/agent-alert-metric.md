@@ -66,7 +66,9 @@ investigation should start scoped to it.
 7. **Drill into exemplar traces.** `get_agent_trace` on two or three of the worst
    traces from the breach window and one or two healthy traces from before the onset.
    Compare span by span: where does the time go, where do the tokens go, which span
-   grew or started failing.
+   grew or started failing. (`get_agent_trace` reads managed-store (`ao_clickhouse_otel`)
+   agents only — on other backends it errors; get span-grain depth from
+   `run_troubleshooting_agent`, per the backend guide.)
 
 ## Reading the results
 

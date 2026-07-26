@@ -14,8 +14,10 @@ model-swap question has no answer on this backend. Never chase token anomalies.*
 
 ## Signal available here
 
-- **Per-turn traces** — `get_agent_trace` shows the turn: a root span with the question
-  and final answer, chain steps, and retriever tool-call spans.
+- **Per-turn traces** — each trace is one turn: a root span with the question and final
+  answer, chain steps, and retriever tool-call spans. (`get_agent_trace` does not read
+  this backend — it errors; span-grain detail comes from `run_troubleshooting_agent`,
+  and manual reads work at turn grain via `get_agent_traces`.)
 - **Retrieval grounding (the differentiator)** — the retriever spans' tool-call output
   holds the retrieved document chunks. What was asked, what was retrieved, and whether
   the answer was grounded in it is THE signal on this backend. Chunk content is
@@ -34,8 +36,7 @@ model-swap question has no answer on this backend. Never chase token anomalies.*
 - **Conversation grouping is usually absent** — `conversation_id` is frequently null;
   each trace is then a standalone turn. Do not rely on conversation reads
   (`get_agent_conversations` / `get_agent_conversation` may come back empty — that is
-  expected, not a data problem; work at turn grain with `get_agent_traces` /
-  `get_agent_trace` instead).
+  expected, not a data problem; work at turn grain with `get_agent_traces` instead).
 - **Eval scores are not in the spans** — quality scores are Monte Carlo–computed and
   live on the monitor/alert.
 - **No SQL and no lineage** — a Knowledge Assistant generates no SQL, so there are no

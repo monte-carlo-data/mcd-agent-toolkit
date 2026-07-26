@@ -16,7 +16,10 @@ table yourself.**
 ## Signal available here
 
 - **Real multi-span trace tree** with parent/child structure, per-span timing, and
-  status — via `get_agent_trace`.
+  status — captured in the normalized data. There is no direct MCP span-tree read here
+  (`get_agent_trace` is managed-store-only and errors on this backend): span-grain
+  drill-down goes through `run_troubleshooting_agent`; manual reads work at trace
+  grain via `get_agent_traces`.
 - **Model and token counts per span** — model-swap, cost, and context-growth questions
   have answers here (unlike Genie and the Knowledge Assistant).
 - **Workflow / task segmentation** — customer-set attributes broadcast trace-wide;
@@ -49,8 +52,10 @@ table yourself.**
    (`get_agent_segments`); a regression confined to one node or one model is a
    different root cause than a fleet-wide one.
 4. **Classify errors before hypothesizing** — provider rejection, timeout, fast-fail,
-   parse failure, code exception, slow-but-healthy — and on a known-bad trace list its
-   failed spans in order with `get_agent_trace` (earliest/innermost failure first).
+   parse failure, code exception, slow-but-healthy — and get a known-bad trace's
+   failed-spans-in-order view from the automated run (`run_troubleshooting_agent`;
+   earliest/innermost failure first). `get_agent_trace` errors on this backend —
+   manual MCP reads stop at trace grain.
 5. **Compare content across cohorts** when consent allows — breaching vs pre-onset
    prompts and completions.
 6. **Correlate with changes** — PRs merged before the onset, provider status pages,

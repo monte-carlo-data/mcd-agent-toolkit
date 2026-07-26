@@ -5,6 +5,16 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1] - 2026-07-26
+
+### Fixed
+
+- troubleshoot-agent-traces: document that `get_agent_trace` (single-trace span tree)
+  reads only the Monte Carlo–managed OTel store (`ao_clickhouse_otel`) and errors on
+  the Cortex, Genie, customer-OTel, and MLflow backends. Backend guides, alert
+  playbooks, direct-trace intake, and the tool tables now route span-grain drill-down
+  on those backends through `run_troubleshooting_agent` (AI-710).
+
 ## [1.22.0] - 2026-07-22
 
 ### Added
