@@ -49,6 +49,12 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 | **Storage Cost Analysis** | Identifies storage waste (unread, zombie, dead-end tables); uses lineage to verify cleanup is safe and estimates savings. | [README](skills/storage-cost-analysis/README.md) |
 | **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, Databricks, and other platforms. | [README](skills/performance-diagnosis/README.md) |
 
+### Evaluate — compare agent runs
+
+| Skill | Description | Details |
+|---|---|---|
+| **Compare Trace** | A/B compares two existing agent traces (by ID) — graph path, latency/tokens, tool-call sequence, plus LLM-based semantic and entity-overlap diffs over the final answers. Emits an HTML report. | [README](skills/compare-trace/README.md) |
+
 ### Setup — ingestion and connections
 
 | Skill | Description | Details |

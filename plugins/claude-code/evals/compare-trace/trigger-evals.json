@@ -1,0 +1,126 @@
+{
+  "skill": "monte-carlo-compare-trace",
+  "description": "Trigger accuracy evals for the monte-carlo-compare-trace skill. Each case specifies whether the skill SHOULD or SHOULD NOT be triggered by the given prompt.",
+  "cases": [
+    {
+      "id": "should-01",
+      "prompt": "Compare these two agent conversations: 019e8f2a-24ae-7880-8901-cbc79aca43ed and 019e9319-e88e-7080-bc78-2aff46543849",
+      "expected": "trigger",
+      "rationale": "Direct A/B compare with two conversation IDs -- core skill use case"
+    },
+    {
+      "id": "should-02",
+      "prompt": "Diff these two agent runs and tell me what changed.",
+      "expected": "trigger",
+      "rationale": "Explicit 'diff two agent runs' phrasing -- listed trigger"
+    },
+    {
+      "id": "should-03",
+      "prompt": "I tweaked the system prompt for the coverage agent and re-ran it on the same conversation. Did the change cause a regression? Here are the two IDs.",
+      "expected": "trigger",
+      "rationale": "Prompt change regression check between two runs -- explicit use case"
+    },
+    {
+      "id": "should-04",
+      "prompt": "/compare-trace 019e8f2a-24ae-7880-8901-cbc79aca43ed 019e9319-e88e-7080-bc78-2aff46543849",
+      "expected": "trigger",
+      "rationale": "Explicit slash-command invocation -- skill's own command"
+    },
+    {
+      "id": "should-05",
+      "prompt": "Here are two conversation IDs from the chat agent — show me how the tool sequences differ.",
+      "expected": "trigger",
+      "rationale": "Tool-sequence diff between two conversations -- tool_call_diff evaluator territory"
+    },
+    {
+      "id": "should-06",
+      "prompt": "We swapped the agent model from claude-3-5 to claude-sonnet-4 and re-ran a fixed scenario. Compare the two runs.",
+      "expected": "trigger",
+      "rationale": "Model-swap A/B with two runs to compare -- explicit use case"
+    },
+    {
+      "id": "should-07",
+      "prompt": "Compare the OTel traces from these two agent runs and produce a side-by-side report.",
+      "expected": "trigger",
+      "rationale": "Trace-level comparison with HTML-report intent -- matches skill output"
+    },
+    {
+      "id": "should-08",
+      "prompt": "I have two agent traces I want to look at side-by-side. Conversation IDs are X and Y.",
+      "expected": "trigger",
+      "rationale": "Side-by-side trace comparison with both IDs supplied"
+    },
+    {
+      "id": "should-09",
+      "prompt": "Show me the difference in graph path between baseline and candidate runs of the coverage agent.",
+      "expected": "trigger",
+      "rationale": "Graph-path diff between two runs -- graph_path_diff evaluator territory"
+    },
+    {
+      "id": "should-10",
+      "prompt": "Did removing the get_use_cases tool change how the coverage agent handles 'what's my coverage gap?' Compare a before and after run.",
+      "expected": "trigger",
+      "rationale": "Tool-loadout change A/B between two runs -- explicit use case"
+    },
+    {
+      "id": "should-11",
+      "prompt": "Compare the latency and token usage between these two agent conversations.",
+      "expected": "trigger",
+      "rationale": "Latency/token diff between two runs -- latency_diff evaluator territory"
+    },
+    {
+      "id": "should-not-01",
+      "prompt": "What went wrong with this agent run? Here's the conversation ID.",
+      "expected": "no-trigger",
+      "rationale": "Single-trace troubleshooting -- not a comparison; routes to analyze-root-cause / incident-response"
+    },
+    {
+      "id": "should-not-02",
+      "prompt": "Investigate why this trace failed. The conversation ID is 019e8f2a-24ae-7880-8901-cbc79aca43ed.",
+      "expected": "no-trigger",
+      "rationale": "Single-trace failure investigation -- not an A/B comparison"
+    },
+    {
+      "id": "should-not-03",
+      "prompt": "Compare row counts between our staging and production orders tables.",
+      "expected": "no-trigger",
+      "rationale": "Cross-table data comparison -- routes to monitoring-advisor (comparison monitor); not agent A/B"
+    },
+    {
+      "id": "should-not-04",
+      "prompt": "How does my chat agent perform overall? Show me aggregate metrics.",
+      "expected": "no-trigger",
+      "rationale": "Aggregate performance question with no two specific conversation IDs to compare"
+    },
+    {
+      "id": "should-not-05",
+      "prompt": "Set up an evaluation monitor for my chat agent to track response quality over time.",
+      "expected": "no-trigger",
+      "rationale": "Agent eval monitor creation -- routes to monitoring-advisor"
+    },
+    {
+      "id": "should-not-06",
+      "prompt": "Diff these two SQL queries and tell me which one is more efficient.",
+      "expected": "no-trigger",
+      "rationale": "SQL comparison -- wrong domain (not agent traces)"
+    },
+    {
+      "id": "should-not-07",
+      "prompt": "Show me the trace for conversation 019e8f2a-24ae-7880-8901-cbc79aca43ed.",
+      "expected": "no-trigger",
+      "rationale": "Single-trace inspection -- not a comparison"
+    },
+    {
+      "id": "should-not-08",
+      "prompt": "Help me build a prompt eval framework for my LangGraph agent.",
+      "expected": "no-trigger",
+      "rationale": "Generic eval-framework engineering -- not an A/B compare on existing runs"
+    },
+    {
+      "id": "should-not-09",
+      "prompt": "Compare these two dbt models and tell me which one has more downstream tables.",
+      "expected": "no-trigger",
+      "rationale": "dbt model comparison -- wrong domain"
+    }
+  ]
+}

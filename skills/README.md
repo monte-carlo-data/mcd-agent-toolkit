@@ -23,6 +23,7 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 | **[Tune Monitor](tune-monitor/)** | Analyzes a Monte Carlo metric monitor's alert history and recommends configuration changes to reduce noise — sensitivity, WHERE conditions, segment exclusions, schedule, and aggregation. |
 | **[Connection Auth Rules](connection-auth-rules/)** | Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo. |
 | **[Instrument Agent](instrument-agent/)** | Instruments a Python AI agent for Monte Carlo Agent Observability — detects AI libraries, installs the Monte Carlo OpenTelemetry SDK, sets up tracing, and verifies traces in Monte Carlo. Asks before editing. |
+| **[Compare Trace](compare-trace/)** | A/B compares two Monte Carlo agent traces by ID — runs graph-path, latency/token, and tool-call diffs plus LLM-based semantic and entity-overlap evals over the final answers, and opens an HTML report. |
 
 ## Standalone Installation
 

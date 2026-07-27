@@ -14,3 +14,9 @@ temp/
 __pycache__/
 *.pyc
 .work/
+
+# Local install artifacts from running plugins/codex/scripts/install.sh
+# against this repo. Intended for downstream target repos, not this one.
+.agents/
+.codex/
+plugins/mc-agent-toolkit/

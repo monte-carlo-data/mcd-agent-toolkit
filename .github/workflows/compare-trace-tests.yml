@@ -1,0 +1,30 @@
+name: Compare Trace Skill Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/compare-trace/**'
+      - '.github/workflows/compare-trace-tests.yml'
+  pull_request:
+    paths:
+      - 'skills/compare-trace/**'
+      - '.github/workflows/compare-trace-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # test_otel_spans.py exercises sources/otel_spans.py via subprocess.
+      # Stdlib only — no pip install needed.
+      - name: Run otel_spans normalizer tests
+        run: python3 skills/compare-trace/tests/test_otel_spans.py
