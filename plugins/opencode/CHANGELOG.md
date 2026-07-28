@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.2] - 2026-07-27
+
+### Changed
+
+- reinforce-agent: renamed the Monte Carlo tools the skill calls to their reinforcement loop names — `get_agent_health_summaries` → `get_reinforcement_loop_summaries` and `get_agent_health` → `get_reinforcement_loop_report` — and rebranded the skill guidance from "agent-health" to "reinforcement loop" (ORB-444).
+
 ## [1.22.1] - 2026-07-26
 
 ### Fixed
