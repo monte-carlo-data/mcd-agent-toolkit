@@ -137,13 +137,16 @@ offer models from the wrong pool:
 
 | Agent's warehouse | Judge models (default first) |
 |-------------------|------------------------------|
-| Snowflake (Cortex) | `llama3.1-70b`, `llama3.1-405b`, `llama3.1-8b`, `mistral-large`, `mixtral-8x7b`, `jamba-1.5-large`, `jamba-1.5-mini`, `jamba-instruct`, `snowflake-arctic` — **no Claude models on Snowflake** |
+| Snowflake (Cortex) | Cortex model names: `llama3.1-70b`, `llama3.1-8b`, `llama3.3-70b`, `llama4-maverick`, `mixtral-8x7b`, `mistral-large2`, `mistral-large3`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`, `claude-opus-4-8`, `openai-gpt-5.1`, `openai-gpt-5`, `openai-gpt-5-mini`, `openai-gpt-5-nano`, `openai-gpt-4.1`, `gemini-3.1-pro` |
 | Databricks | `databricks-meta-llama-3-3-70b-instruct`, plus other `databricks-*` endpoints |
 | BigQuery | `gemini-2.5-flash`, `gemini-2.5-pro` |
-| OpenTelemetry (ClickHouse/Athena traces) | `us.anthropic.claude-sonnet-4-5-20250929-v1:0`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`, `us.anthropic.claude-opus-4-1-20250805-v1:0` |
+| OpenTelemetry (ClickHouse/Athena traces), AWS-hosted deployment (most accounts) | `us.anthropic.claude-sonnet-5`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`, `us.anthropic.claude-sonnet-4-5-20250929-v1:0`, `us.anthropic.claude-opus-4-8` |
+| OpenTelemetry, GCP/Azure-hosted deployment | short names: `claude-sonnet-5`, `claude-haiku-4-5` (GCP: `claude-haiku-4-5@20251001`), `claude-opus-4-8` |
 
 A known catalog model on the wrong warehouse is rejected at dry-run; unrecognized
-names pass through to the warehouse as-is.
+names pass through to the warehouse as-is. The catalog changes over time — when a
+user asks for a model not listed here, try it in a dry-run rather than declaring it
+unavailable.
 
 **`modelConnectionId`** is **BigQuery-only** (and required there) — the BigQuery
 Cloud resource connection in the customer's own GCP project that runs the judge. It
