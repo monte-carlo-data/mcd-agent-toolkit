@@ -79,10 +79,11 @@ transforms, which those don't need.
 
 ## Predefined LLM transforms
 
-Pass only `function` (and an optional `alias`, plus `modelConnectionId` on
-BigQuery). Do NOT set `prompt`, `sqlExpression`, `outputType`, or `field` — the tool
-rejects them. Each writes a numeric score (1–5, except `semantic_similarity` which is
-0–5) to its built-in output field:
+Pass only `function` (plus an optional `alias`, an optional `modelName` to pin the
+judge model — see **Judge model selection** below — and `modelConnectionId` on
+BigQuery only). Do NOT set `prompt`, `sqlExpression`, `outputType`, or `field` — the
+tool rejects them. Each writes a numeric score (1–5, except `semantic_similarity`
+which is 0–5) to its built-in output field:
 
 | Transform function | Output field | Output type | Description |
 |-------------------|-------------|-------------|-------------|
@@ -97,7 +98,7 @@ rejects them. Each writes a numeric score (1–5, except `semantic_similarity` w
 ## Predefined SQL transforms (rule-based, no LLM needed)
 
 Same rule: pass only `function` (and an optional `alias`); do NOT set `prompt`,
-`sqlExpression`, `outputType`, `modelConnectionId`, or `field`.
+`sqlExpression`, `outputType`, `modelConnectionId`, `modelName`, or `field`.
 
 | Transform function | Output field | Output type | Description |
 |-------------------|-------------|-------------|-------------|
@@ -113,8 +114,8 @@ Each writes an output column named by its `alias`, and that alias is what
 
 | Function | Set these | Do NOT set | Output type |
 |----------|-----------|------------|-------------|
-| `custom_prompt` | `prompt` (with a `{{variable}}`), `alias`, `outputType` | `field`, `sqlExpression` | number / string / boolean |
-| `custom_sql` | `sqlExpression`, `alias`, `outputType` | `field`, `prompt`, `modelConnectionId` | number / string / boolean |
+| `custom_prompt` | `prompt` (with a `{{variable}}`), `alias`, `outputType`, + optional `modelName` (see Judge model selection) | `field`, `sqlExpression` | number / string / boolean |
+| `custom_sql` | `sqlExpression`, `alias`, `outputType` | `field`, `prompt`, `modelConnectionId`, `modelName` | number / string / boolean |
 
 - **`custom_prompt` prompts MUST reference at least one template variable** —
   `{{prompts}}`, `{{completions}}`, or `{{expected_output}}` for a per-span monitor,
@@ -127,8 +128,46 @@ Each writes an output column named by its `alias`, and that alias is what
   `prompts`/`completions` are arrays — reference the string columns
   `first_completion` / `full_completion` / `first_prompt` instead. The dry-run does
   not evaluate the SQL, so a bad column surfaces only at run time.
-- **`modelConnectionId`** is optional for LLM-based transforms (predefined judges and
-  `custom_prompt`) and REQUIRED on BigQuery warehouses. Omit it elsewhere.
+## Judge model selection (`modelName`)
+
+**`modelName`** pins the judge model for LLM-based transforms (predefined judges and
+`custom_prompt`). Optional — omit it to use the warehouse default. **Models are
+warehouse-specific** because the judge runs inside the warehouse hosting the agent's
+**trace table** — never offer models from the wrong pool:
+
+| Trace table's warehouse | Judge models (default first) |
+|-------------------|------------------------------|
+| Snowflake (Cortex) | `llama3.1-70b`, `llama3.1-8b`, `llama3.3-70b`, `llama4-maverick`, `mixtral-8x7b`, `mistral-large2`, `mistral-large3`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`, `claude-opus-4-8`, `openai-gpt-5.1`, `openai-gpt-5`, `openai-gpt-5-mini`, `openai-gpt-5-nano`, `openai-gpt-4.1`, `gemini-3.1-pro` |
+| Databricks | `databricks-meta-llama-3-3-70b-instruct`, `databricks-meta-llama-3-1-8b-instruct`, `databricks-gpt-5`, `databricks-gpt-5-mini`, `databricks-gpt-5-nano`, `databricks-gpt-oss-20b`, `databricks-gpt-oss-120b`, `databricks-gemma-3-12b`, `databricks-llama-4-maverick` |
+| BigQuery | `gemini-2.5-flash`, `gemini-2.5-pro` |
+| Athena trace tables (any cloud), or ClickHouse trace tables on an AWS-hosted deployment (most accounts) | `us.anthropic.claude-sonnet-5`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`, `us.anthropic.claude-sonnet-4-5-20250929-v1:0`, `us.anthropic.claude-opus-4-8`, `us.anthropic.claude-opus-4-1-20250805-v1:0` |
+| ClickHouse trace tables on a GCP/Azure-hosted deployment | short names — `claude-sonnet-5`, `claude-haiku-4-5` (GCP: `claude-haiku-4-5@20251001`), `claude-opus-4-8`. Athena trace tables always use the AWS `us.anthropic.*` ids (not cloud-resolved). |
+
+The pool follows the warehouse the agent's traces live in (`warehouse_uuid`/
+`warehouse_name` from `get_agent_metadata`), not the agent's `backend_class` — a
+customer OTel trace table on Snowflake uses the Snowflake pool.
+
+Snapshot as of 2026-07-29 (source: monolith `validations/llm_models.yaml`) —
+re-verify before quoting as exhaustive.
+
+On Snowflake, everything except `llama3.1-*`, `llama3.3-70b`, `mixtral-8x7b` and
+`mistral-large2` requires Cortex cross-region inference enabled
+(`CORTEX_ENABLED_CROSS_REGION`); the dry-run does NOT check this — flag it to the
+user before pinning.
+
+A known catalog model on the wrong warehouse is rejected at dry-run. An unrecognized
+name is NOT validated — it is accepted as a custom model and fails at evaluation
+time if the warehouse doesn't host it; a passing dry-run is not evidence the model
+exists. Prefer a listed model; if the user insists on an unlisted one, pin it but
+tell them it could not be verified and to check that the monitor's first run
+produced scores.
+
+**`modelConnectionId`** is **BigQuery-only** (and required there) — the BigQuery
+Cloud resource connection in the customer's own GCP project that runs the judge. It
+is NOT a Monte Carlo setting or integration and Monte Carlo cannot list it; on
+BigQuery, ask the user for their BigQuery connection ID. **On every other warehouse,
+omit it entirely and never ask the user for it.** To choose the judge model, use
+`modelName` — there is no "model connection" to configure outside BigQuery.
 
 ## Conversation-grain judges
 

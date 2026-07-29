@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.3] - 2026-07-29
+
+### Changed
+
+- monitoring-advisor: judge model selection via `modelName` on LLM-based eval transforms; `modelConnectionId` is BigQuery-only (AI-771)
+
 ## [1.22.2] - 2026-07-27
 
 ### Changed
