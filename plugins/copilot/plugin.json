@@ -1,6 +1,6 @@
 {
     "name": "mc-agent-toolkit",
-    "version": "1.22.3",
+    "version": "1.23.0",
     "description": "Monte Carlo Agent Toolkit — data observability for AI coding agents.",
     "author": {
         "name": "Monte Carlo",
