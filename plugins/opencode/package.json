@@ -1,6 +1,6 @@
 {
   "name": "@montecarlo/mc-agent-toolkit",
-  "version": "1.22.2",
+  "version": "1.22.3",
   "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents.",
   "type": "module",
   "main": "src/index.ts",
