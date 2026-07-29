@@ -72,6 +72,12 @@ preview-then-confirm rules from the metric monitor reference apply (always pass
   the agent was likely deleted, renamed, or moved, and the monitor can't be updated until that's
   resolved.
 - **NEVER** put an `agent` entry inside `agent_span_filters` (see above).
+- **`trace_table` is conditional on the store.** For a non-ClickHouse OTel agent (e.g. a
+  Snowflake trace table), pass the monitor's trace table (fullTableId form, e.g.
+  `ingest:opentelemetry.traces`) as `trace_table` on **every** edit — the API rejects the edit
+  without it. For an agent on the Monte Carlo-managed ClickHouse store
+  (`...otel_traces:otel_traces.spans_normalized`), **never** pass `trace_table` — the API
+  rejects an explicit reference to its own store (it resolves it from the agent automatically).
 - **PUT semantics** — same as all monitor types: omitted fields revert to defaults. Re-pass
   everything you want to keep, and note two easy-to-miss fields:
   - `is_draft` — omitting it both un-drafts AND un-pauses a paused monitor.
