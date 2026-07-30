@@ -1,6 +1,6 @@
 {
   "name": "mc-agent-toolkit",
-  "version": "1.22.3",
+  "version": "1.23.0",
   "description": "Monte Carlo Agent Toolkit — data observability for AI coding agents. Surfaces blast radius, active alerts, and monitor coverage gaps before you edit dbt SQL. Includes skills for incident response, proactive monitoring, storage cost analysis, and push ingestion. Hooks enforce data-safety checks automatically as you work.",
   "author": {
     "name": "Monte Carlo",

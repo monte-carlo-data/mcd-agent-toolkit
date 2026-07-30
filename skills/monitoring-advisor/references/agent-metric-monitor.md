@@ -131,8 +131,9 @@ latency (`duration_sec`), volume, and error/outcome metrics instead.
 - **OTel agents only.** Platform agent references (`{database}:{schema}.{name}`) are
   rejected — the per-trace query isn't built for them. Target an OTel `service_name`,
   or pass an explicit `trace_table`.
-- **Only the `agent` span filter is allowed** — remove `workflow` / `task` /
-  `spanName` from `agent_span_filters`, since the per-trace result has no such column.
+- **No span filters are supported** — remove `agent_span_filters` entirely (including
+  `agent`). The monitor's agent is identified by the top-level `agent` parameter, not a
+  span filter; the per-trace result has no columns a span filter could match against.
 - Use the trace-aggregation field names (`span_count`, `llm_call_count`, trace-summed
   tokens, total `duration_sec`). See `agent-span-fields.md`.
 

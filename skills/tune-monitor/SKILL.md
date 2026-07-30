@@ -1,6 +1,6 @@
 ---
 name: tune-monitor
-description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, and table monitors. Fetches the report, identifies patterns, and suggests tuning.
+description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, table, and agent metric monitors. Fetches the report, identifies patterns, and suggests tuning.
 when_to_use: |
   Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor.
   Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>".
@@ -31,6 +31,7 @@ them:
 - Custom SQL monitor tuning: `references/custom-sql-monitor.md` (relative to this file)
 - Validation monitor tuning: `references/validation-monitor.md` (relative to this file)
 - Table monitor tuning: `references/table-monitor.md` (relative to this file)
+- Agent metric monitor tuning: `references/agent-metric-monitor.md` (relative to this file)
 
 ---
 
@@ -50,8 +51,9 @@ them:
 | `create_or_update_sql_monitor` | Update a custom SQL monitor in place (pass `monitor_uuid`; used in Phase 5) |
 | `create_or_update_validation_monitor` | Update a validation monitor in place (pass `monitor_uuid`; used in Phase 5) |
 | `create_or_update_table_monitor_asset_rule` | Tune freshness / volume change / unchanged size for a single table; pick the per-metric variant via `rule_type` (`last_updated_on` / `total_row_count` / `total_row_count_last_changed_on`). One call per `(table, metric)` pair (used in Phase 5). |
+| `create_or_update_agent_metric_monitor` | Update an agent metric monitor in place (pass `monitor_uuid`; used in Phase 5) |
 
-All three `create_or_update_*_monitor` tools follow a **two-call preview-then-confirm pattern**: the first call (with the default `dry_run=True`) returns the rendered MaC YAML for review in `result.yaml`; the second call (`dry_run=False`) deploys the change live and returns a deep link in `result.instructions`. **Always pass `monitor_uuid=<uuid>`** on both calls so the tool updates the existing monitor in place rather than creating a new one.
+All the `create_or_update_*` tools follow a **two-call preview-then-confirm pattern**: the first call (with the default `dry_run=True`) returns the rendered MaC YAML for review in `result.yaml`; the second call (`dry_run=False`) deploys the change live and returns a deep link in `result.instructions`. **Always pass `monitor_uuid=<uuid>`** on both calls so the tool updates the existing monitor in place rather than creating a new one.
 
 ---
 
@@ -92,15 +94,17 @@ From the `get_monitors` config response, determine the monitor type:
 | Monitor type is a custom SQL rule / custom monitor | Custom SQL | `references/custom-sql-monitor.md` |
 | Monitor type is a validation rule / validation monitor | Validation | `references/validation-monitor.md` |
 | Monitor type is a table monitor (freshness, volume, schema across tables) | Table | `references/table-monitor.md` |
+| Monitor type is an agent metric monitor (metric over an AI agent's trace table) | Agent metric | `references/agent-metric-monitor.md` |
 
 **Read** the appropriate reference file using the Read tool with the path relative to this skill
 file. The reference contains type-specific config fields to extract, recommendation guidance, and
 apply-changes instructions.
 
-If the monitor type is not metric, custom SQL, validation, or table, stop and tell the user:
+If the monitor type is not metric, custom SQL, validation, table, or agent metric, stop and
+tell the user:
 
-> This skill supports tuning metric, custom SQL, validation, and table monitors. This monitor
-> is a {type} monitor, which is not supported.
+> This skill supports tuning metric, custom SQL, validation, table, and agent metric monitors.
+> This monitor is a {type} monitor, which is not supported.
 
 ---
 
@@ -188,7 +192,7 @@ Output a structured analysis. **This is the primary output — include it in ful
 ## Monitor Tune Report: {monitor_uuid}
 
 **Monitor:** {display_name or mac_name}
-**Type:** {monitor type — metric, custom SQL, validation, or table}
+**Type:** {monitor type — metric, custom SQL, validation, table, or agent metric}
 **Table:** {table}
 **What it monitors:** {metric and segments, SQL query summary, validation conditions, or table/metric coverage}
 **Current sensitivity:** {sensitivity or "AUTO (default)" or "N/A (explicit thresholds)"}

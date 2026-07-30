@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-07-29
+
+### Added
+
+- tune-monitor: agent metric monitor support — new `references/agent-metric-monitor.md` (agent-reference verbatim rule, span-filter write-shape traps, trace-aggregation exclusivity), Phase 1.5 dispatch row, and the `create_or_update_agent_metric_monitor` apply flow (AI-780)
+
 ## [1.22.3] - 2026-07-29
 
 ### Changed
