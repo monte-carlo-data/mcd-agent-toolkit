@@ -81,8 +81,9 @@ flat as traffic grows; a `percentage` tracks traffic.
 
 ## Edits that reset the monitor
 
-Thresholds, operators, sensitivity, sampling, and judge prompts do NOT reset metric history.
-Changing the row-filter / span-filter scope or `aggregate_by` DOES reset it — flag the reset and
+Thresholds, sensitivity, sampling, judge prompts, and explicit-to-explicit operator swaps do NOT
+reset metric history. Switching a condition between the explicit and AUTO families DOES reset it,
+as does changing the row-filter / span-filter scope or `aggregate_by` — flag the reset and
 the AUTO re-learning window, and reach for these only when condition-level levers can't express
 the fix. When changing `aggregate_by`, the collection lag must be a whole multiple of the new
 bucket (day buckets need lag 0/24/48h). Conversation-vs-span **grain is not a lever** — switching
