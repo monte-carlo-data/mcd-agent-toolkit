@@ -1,6 +1,6 @@
 ---
 name: tune-monitor
-description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, table, and agent metric monitors. Fetches the report, identifies patterns, and suggests tuning.
+description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, table, and agent (metric, evaluation, trajectory, validation) monitors. Fetches the report, identifies patterns, and suggests tuning.
 when_to_use: |
   Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor.
   Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>".
@@ -32,6 +32,9 @@ them:
 - Validation monitor tuning: `references/validation-monitor.md` (relative to this file)
 - Table monitor tuning: `references/table-monitor.md` (relative to this file)
 - Agent metric monitor tuning: `references/agent-metric-monitor.md` (relative to this file)
+- Agent evaluation monitor tuning: `references/agent-evaluation-monitor.md` (relative to this file)
+- Agent trajectory monitor tuning: `references/agent-trajectory-monitor.md` (relative to this file)
+- Agent validation monitor tuning: `references/agent-validation-monitor.md` (relative to this file)
 
 ---
 
@@ -52,6 +55,9 @@ them:
 | `create_or_update_validation_monitor` | Update a validation monitor in place (pass `monitor_uuid`; used in Phase 5) |
 | `create_or_update_table_monitor_asset_rule` | Tune freshness / volume change / unchanged size for a single table; pick the per-metric variant via `rule_type` (`last_updated_on` / `total_row_count` / `total_row_count_last_changed_on`). One call per `(table, metric)` pair (used in Phase 5). |
 | `create_or_update_agent_metric_monitor` | Update an agent metric monitor in place (pass `monitor_uuid`; used in Phase 5) |
+| `create_or_update_agent_evaluation_monitor` | Update an agent evaluation monitor in place (pass `monitor_uuid`; used in Phase 5) |
+| `create_or_update_agent_trajectory_monitor` | Update an agent trajectory monitor in place (pass `monitor_uuid`; used in Phase 5) |
+| `create_or_update_agent_validation_monitor` | Update an agent validation monitor in place (pass `monitor_uuid`; used in Phase 5) |
 
 All the `create_or_update_*` tools follow a **two-call preview-then-confirm pattern**: the first call (with the default `dry_run=True`) returns the rendered MaC YAML for review in `result.yaml`; the second call (`dry_run=False`) deploys the change live and returns a deep link in `result.instructions`. **Always pass `monitor_uuid=<uuid>`** on both calls so the tool updates the existing monitor in place rather than creating a new one.
 
@@ -95,16 +101,20 @@ From the `get_monitors` config response, determine the monitor type:
 | Monitor type is a validation rule / validation monitor | Validation | `references/validation-monitor.md` |
 | Monitor type is a table monitor (freshness, volume, schema across tables) | Table | `references/table-monitor.md` |
 | Monitor type is an agent metric monitor (metric over an AI agent's trace table) | Agent metric | `references/agent-metric-monitor.md` |
+| Monitor type is an agent evaluation monitor (LLM-judge / SQL transforms over sampled agent traffic) | Agent evaluation | `references/agent-evaluation-monitor.md` |
+| Monitor type is an agent trajectory monitor (span-pattern rule over an agent's traces) | Agent trajectory | `references/agent-trajectory-monitor.md` |
+| Monitor type is an agent validation monitor (predicate rule flagging invalid span rows) | Agent validation | `references/agent-validation-monitor.md` |
 
 **Read** the appropriate reference file using the Read tool with the path relative to this skill
 file. The reference contains type-specific config fields to extract, recommendation guidance, and
 apply-changes instructions.
 
-If the monitor type is not metric, custom SQL, validation, table, or agent metric, stop and
-tell the user:
+If the monitor type is not metric, custom SQL, validation, table, or one of the agent monitor
+types (metric, evaluation, trajectory, validation), stop and tell the user:
 
-> This skill supports tuning metric, custom SQL, validation, table, and agent metric monitors.
-> This monitor is a {type} monitor, which is not supported.
+> This skill supports tuning metric, custom SQL, validation, table, and agent (metric,
+> evaluation, trajectory, validation) monitors. This monitor is a {type} monitor, which is not
+> supported.
 
 ---
 
@@ -153,9 +163,10 @@ Based on the analysis, produce a prioritized list of recommendations. For each r
 #### Sensitivity tuning (ML thresholds only)
 This applies to any monitor that uses ML thresholds — both metric monitors and custom SQL monitors.
 Skip this section for validation monitors (they don't use ML thresholds), for table monitors
-(they have their own per-metric sensitivity — see the table monitor reference), and for monitors
-with explicit thresholds (for custom SQL monitors, see threshold adjustment in the per-type
-reference instead).
+(they have their own per-metric sensitivity — see the table monitor reference), for agent
+trajectory and agent validation monitors (no thresholds or sensitivity at all — see their
+references), and for monitors with explicit thresholds (for custom SQL monitors, see threshold
+adjustment in the per-type reference instead).
 
 - If anomalies are consistently marginal (observed value just barely above threshold) AND assessed
   as normal variation → recommend lowering sensitivity one step:
@@ -192,7 +203,7 @@ Output a structured analysis. **This is the primary output — include it in ful
 ## Monitor Tune Report: {monitor_uuid}
 
 **Monitor:** {display_name or mac_name}
-**Type:** {monitor type — metric, custom SQL, validation, table, or agent metric}
+**Type:** {monitor type — metric, custom SQL, validation, table, or an agent monitor type}
 **Table:** {table}
 **What it monitors:** {metric and segments, SQL query summary, validation conditions, or table/metric coverage}
 **Current sensitivity:** {sensitivity or "AUTO (default)" or "N/A (explicit thresholds)"}

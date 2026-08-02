@@ -84,5 +84,7 @@ preview-then-confirm rules from the metric monitor reference apply (always pass
   - `tags` — omitting them silently drops the monitor's tags (including the agent tags the
     platform uses for routing).
 - Sensitivity and `aggregate_by` values are lowercase (`"low"`, `"day"`).
+- **Cron-scheduled monitors can't be tuned via these tools** — the tools express only
+  `interval_minutes`, so an edit would silently drop a cron expression. Stop and say so.
 - **Diff the preview against the original** before `dry_run=False`, exactly as for metric
   monitors.
