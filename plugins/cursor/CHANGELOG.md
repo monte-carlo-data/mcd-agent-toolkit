@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-08-02
+
+### Added
+
+- tune-monitor: agent evaluation / trajectory / validation monitor support — new `references/agent-{evaluation,trajectory,validation}-monitor.md` (judge-criteria verbatim-prompt rule, transforms/sampling and condition-tree re-pass traps, lookback-vs-schedule axis), Phase 1.5 dispatch rows, and the `create_or_update_agent_{evaluation,trajectory,validation}_monitor` apply flows (AI-781)
+
 ## [1.23.0] - 2026-07-29
 
 ### Added
