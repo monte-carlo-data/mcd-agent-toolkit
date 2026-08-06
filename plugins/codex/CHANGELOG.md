@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.1] - 2026-08-06
+
+### Fixed
+
+- prevent: sub-agent edits to dbt models are no longer blocked indefinitely — the change-impact gate now also scans the session's sub-agent transcripts, where a sub-agent's `MC_IMPACT_CHECK_COMPLETE` marker is written. Only model-authored text counts, so the gate still requires a real assessment before the edit
+
 ## [1.24.0] - 2026-08-02
 
 ### Added

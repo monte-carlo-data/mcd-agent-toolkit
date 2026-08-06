@@ -17,6 +17,7 @@ def main():
         session_id=raw.get("session_id", "unknown"),
         file_path=raw.get("tool_input", {}).get("file_path", ""),
         transcript_path=raw.get("transcript_path", ""),
+        agent_id=raw.get("agent_id"),
     )
     result = evaluate_pre_edit(inp)
     if result.action == "deny":
