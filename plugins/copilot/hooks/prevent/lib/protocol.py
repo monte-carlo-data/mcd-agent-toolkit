@@ -4,6 +4,7 @@ All business logic for the prevent hooks lives here.
 Platform adapters (Claude Code, Cursor) call these functions
 and translate the result to their platform's JSON format.
 """
+import glob
 import json
 import os
 import re
@@ -33,7 +34,7 @@ class HookInput:
 
     __slots__ = ("session_id", "file_path", "command", "transcript_path",
                  "cwd", "tool_name", "stop_hook_active", "validate_command",
-                 "transcript_format")
+                 "transcript_format", "agent_id")
 
     def __init__(
         self,
@@ -46,6 +47,7 @@ class HookInput:
         stop_hook_active: bool = False,
         validate_command: str = "/mc-validate",
         transcript_format: str = "raw",
+        agent_id: str | None = None,
     ):
         self.session_id = session_id
         self.file_path = file_path
@@ -55,6 +57,10 @@ class HookInput:
         self.tool_name = tool_name
         self.stop_hook_active = stop_hook_active
         self.validate_command = validate_command
+        # Set when the tool call comes from a sub-agent rather than the main
+        # loop. Sub-agent turns are written to their own transcript, so the
+        # marker scan needs the id to find the right file.
+        self.agent_id = agent_id
         # Transcript layout this adapter produced: "raw" (line-scannable text,
         # the default for Claude Code/Cursor/Copilot/Codex) or "messages_jsonl"
         # (Cortex `.history.jsonl`, where only assistant text blocks are scanned).
@@ -87,12 +93,15 @@ def _compile_marker_patterns(table_name: str):
 
     Matches the table name with an optional MCON-style prefix (e.g.
     "analytics:prod.client_hub") so markers work even if the model emits a fully
-    qualified name instead of just "client_hub".
+    qualified name instead of just "client_hub". The name must END the marker
+    value: qualification is allowed before it, never after, so a marker for
+    "prod.client_hub.events" does not satisfy the gate for "client_hub".
     """
     esc = re.escape(table_name)
+    end = r"(?=\s|$)"
     return (
-        re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}\b"),
-        re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}\b"),
+        re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}{end}"),
+        re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}{end}"),
     )
 
 
@@ -106,6 +115,12 @@ def _match_markers_in_lines(lines, table_name: str) -> dict:
         if mg_pattern.search(line):
             found["monitor_gap"] = True
     return found
+
+
+def _merge_markers(*results: dict) -> dict:
+    """Union of marker results — a marker found in any scanned source counts."""
+    return {key: any(r[key] for r in results)
+            for key in ("impact_check", "monitor_gap")}
 
 
 def scan_transcript_for_markers(transcript_path: str, table_name: str) -> dict:
@@ -140,43 +155,152 @@ def _iter_assistant_text(content) -> list[str]:
     return texts
 
 
-def scan_history_jsonl_for_markers(history_path: str, table_name: str) -> dict:
-    """Scan a Cortex `<id>.history.jsonl` transcript for prevent markers.
+def _scan_jsonl_assistant_text(path: str, table_name: str, extract_texts) -> dict:
+    """Match markers against assistant-authored text in a JSONL transcript.
 
-    Only assistant-authored text blocks are scanned. Cortex persists hook output
-    — including this gate's own deny reason — back into the transcript as a
-    tool_result delivered under role "user". Scanning only assistant text ensures
-    nothing but the model's own emitted marker can unlock the gate.
+    `extract_texts` maps one parsed entry to the assistant text it holds, and
+    returns nothing for anything the model didn't author (the prompt it was
+    given, tool results). Restricting the match to assistant text ensures
+    nothing but the model's own emitted marker can unlock the gate — harnesses
+    persist hook output, including this gate's own deny reason, back into the
+    transcript.
 
-    Each line is an Anthropic Messages-style object:
-        {"role": "assistant", "content": [{"type": "text", "text": "..."}, ...]}
-    Malformed (non-JSON) lines are skipped, and undecodable bytes are replaced
-    (errors="replace") so a stray non-UTF-8 byte doesn't abort the whole scan and
-    miss a genuine marker. Worst case the scan finds no marker and the gate stays
-    denied (fail closed) rather than raising into the adapter's safe_run (which
-    would exit 0 and let the edit through).
+    Undecodable bytes are replaced (errors="replace") so a stray non-UTF-8 byte
+    doesn't abort the scan and miss a genuine marker. Every failure is contained
+    at the narrowest scope that can still make progress: a line that won't parse
+    or extract is skipped and the rest of the file is still read; a file that
+    won't open yields no markers. Both exception guards are deliberately broad —
+    the gate must fail CLOSED, and anything escaping into the adapter's safe_run
+    exits 0 and lets the edit through. Deeply nested JSON (RecursionError) and
+    oversized lines (MemoryError) both take this route.
     """
     found = {"impact_check": False, "monitor_gap": False}
     ic_pattern, mg_pattern = _compile_marker_patterns(table_name)
     try:
-        with open(history_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
             for raw in f:
                 raw = raw.strip()
                 if not raw:
                     continue
                 try:
-                    msg = json.loads(raw)
-                except (json.JSONDecodeError, ValueError):
+                    entry = json.loads(raw)
+                    if not isinstance(entry, dict):
+                        continue
+                    texts = extract_texts(entry)
+                except Exception:
                     continue
-                if not isinstance(msg, dict) or msg.get("role") != "assistant":
-                    continue
-                for text in _iter_assistant_text(msg.get("content")):
+                for text in texts:
                     if ic_pattern.search(text):
                         found["impact_check"] = True
                     if mg_pattern.search(text):
                         found["monitor_gap"] = True
-    except (OSError, UnicodeDecodeError):
+    except Exception:
         pass
+    return found
+
+
+def _cortex_assistant_texts(entry: dict) -> list[str]:
+    """Assistant text of one Cortex `.history.jsonl` entry.
+
+    Each line is an Anthropic Messages-style object:
+        {"role": "assistant", "content": [{"type": "text", "text": "..."}, ...]}
+    Cortex persists hook output as a tool_result delivered under role "user",
+    which this skips.
+    """
+    if entry.get("role") != "assistant":
+        return []
+    return _iter_assistant_text(entry.get("content"))
+
+
+def scan_history_jsonl_for_markers(history_path: str, table_name: str) -> dict:
+    """Scan a Cortex `<id>.history.jsonl` transcript for prevent markers."""
+    return _scan_jsonl_assistant_text(history_path, table_name, _cortex_assistant_texts)
+
+
+# Sub-agent (sidechain) turns are written to their own transcript files, keyed by
+# the acting agent's id, under the session's own directory:
+#   <transcript_dir>/<session_id>/subagents/[<parent_agent_id>/]agent-<agent_id>.jsonl
+# Hook input reports the main session's id and transcript_path in both cases.
+_SIDECHAIN_DIR = "subagents"
+_JSONL_SUFFIX = ".jsonl"
+
+
+def _under_dir(path: str, directory: str) -> bool:
+    """True when `path` resolves to somewhere inside `directory`.
+
+    Symlinks under the transcript directory would otherwise let a scan read
+    another session's markers, so every candidate is checked after resolution.
+    """
+    try:
+        root = os.path.realpath(directory)
+        return os.path.commonpath([root, os.path.realpath(path)]) == root
+    except (OSError, ValueError):
+        return False
+
+
+def _sidechain_transcripts(transcript_path: str, agent_id: str | None) -> list[str]:
+    """Sub-agent transcript files belonging to a main transcript.
+
+    Prefers the acting sub-agent's own file; nested sub-agents sit a directory
+    deeper, so the id is matched anywhere below `subagents/`. `agent_id` is
+    escaped before it reaches the pattern — it comes from the harness payload,
+    and a raw glob metacharacter there would select files the caller never named.
+    Falls back to every sidechain of the session when the id doesn't resolve.
+    Every candidate must resolve inside the session's own directory.
+    Returns nothing for harnesses that don't write sidechains.
+    """
+    if not transcript_path.endswith(_JSONL_SUFFIX):
+        return []
+    session_dir = transcript_path[: -len(_JSONL_SUFFIX)]
+    sidechain_dir = os.path.join(session_dir, _SIDECHAIN_DIR)
+    if not os.path.isdir(sidechain_dir):
+        return []
+
+    def contained(paths):
+        return [p for p in paths if os.path.isfile(p) and _under_dir(p, sidechain_dir)]
+
+    if agent_id:
+        own_name = f"agent-{glob.escape(str(agent_id))}{_JSONL_SUFFIX}"
+        flat = os.path.join(sidechain_dir, own_name)
+        if os.path.isfile(flat) and _under_dir(flat, sidechain_dir):
+            return [flat]
+        own = contained(glob.glob(os.path.join(sidechain_dir, "**", own_name), recursive=True))
+        if own:
+            return own
+    # Newest first: the acting sub-agent wrote most recently, so the marker is
+    # usually in the first file and the scan stops before reading the rest.
+    sweep = contained(
+        glob.glob(os.path.join(sidechain_dir, "**", f"*{_JSONL_SUFFIX}"), recursive=True))
+    return sorted(sweep, key=lambda p: (-os.path.getmtime(p), p))
+
+
+def _claude_code_assistant_texts(entry: dict) -> list[str]:
+    """Assistant text of one Claude Code transcript entry.
+
+    Entries wrap an Anthropic Messages-style object under "message" and carry the
+    author in a top-level "type":
+        {"type": "assistant", "message": {"content": [{"type": "text", ...}]}}
+    """
+    if entry.get("type") != "assistant":
+        return []
+    message = entry.get("message")
+    if not isinstance(message, dict):
+        return []
+    return _iter_assistant_text(message.get("content"))
+
+
+def scan_sidechain_transcripts_for_markers(
+    transcript_path: str, table_name: str, agent_id: str | None = None,
+) -> dict:
+    """Scan a session's sub-agent transcripts for prevent markers."""
+    found = {"impact_check": False, "monitor_gap": False}
+    for path in _sidechain_transcripts(transcript_path, agent_id):
+        found = _merge_markers(
+            found,
+            _scan_jsonl_assistant_text(path, table_name, _claude_code_assistant_texts),
+        )
+        if found["impact_check"] and found["monitor_gap"]:
+            break
     return found
 
 
@@ -186,10 +310,15 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
     Adapters that store messages in an Anthropic Messages-style `.history.jsonl`
     (Cortex) set inp.transcript_format == "messages_jsonl" and point
     transcript_path at that sibling file. "raw" (the default) uses the raw-line
-    scan. An unrecognized format (e.g. a future adapter's typo) deliberately
-    returns no markers so the gate stays denied — failing CLOSED rather than
-    silently scanning with the wrong reader (which would drop the assistant-text
-    protection) or raising (which fails OPEN, since the adapter's safe_run exits 0).
+    scan over the main transcript. A sub-agent's turns are written to their own
+    file, so when the caller is a sub-agent (inp.agent_id is set) its sidechains
+    are scanned too. A main-loop edit reports no agent_id and its own transcript
+    is the whole surface: the evidence must sit in the context window of the
+    agent doing the editing. An unrecognized format (e.g. a future
+    adapter's typo) deliberately returns no markers so the gate stays denied —
+    failing CLOSED rather than silently scanning with the wrong reader (which
+    would drop the assistant-text protection) or raising (which fails OPEN, since
+    the adapter's safe_run exits 0).
     """
     no_markers = {"impact_check": False, "monitor_gap": False}
     path = inp.transcript_path or ""
@@ -198,7 +327,13 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
     if inp.transcript_format == "messages_jsonl":
         return scan_history_jsonl_for_markers(path, table_name)
     if inp.transcript_format == "raw":
-        return scan_transcript_for_markers(path, table_name)
+        main = scan_transcript_for_markers(path, table_name)
+        if not inp.agent_id:
+            return main
+        return _merge_markers(
+            main,
+            scan_sidechain_transcripts_for_markers(path, table_name, inp.agent_id),
+        )
     return no_markers  # unknown format → fail closed
 
 

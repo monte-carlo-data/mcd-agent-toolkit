@@ -13,6 +13,7 @@ from lib.protocol import (
     evaluate_validate_command,
     scan_transcript_for_markers,
     scan_history_jsonl_for_markers,
+    scan_sidechain_transcripts_for_markers,
 )
 
 
@@ -46,6 +47,145 @@ class TestScanTranscriptForMarkers:
         transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: client_hub -->\n')
         result = scan_transcript_for_markers(str(transcript), "client_hub_master")
         assert result["impact_check"] is False
+
+    def test_qualified_prefix_still_matches(self, tmp_path):
+        """A fully qualified name resolves to its final segment."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: analytics:prod.orders -->\n')
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is True
+
+    def test_other_table_qualified_by_target_no_match(self, tmp_path):
+        """orders must end the marker value, not merely appear inside it."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: prod.orders.customers -->\n')
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is False
+
+    def test_hyphenated_sibling_no_match(self, tmp_path):
+        """orders-staging is a different table from orders."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: orders-staging -->\n')
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is False
+
+
+def _cc_entry(entry_type, content, extra=None):
+    """One Claude Code transcript line: author in "type", message nested."""
+    entry = {"type": entry_type, "message": {"role": entry_type, "content": content}}
+    entry.update(extra or {})
+    return json.dumps(entry)
+
+
+def _cc_assistant_text(text):
+    return _cc_entry("assistant", [{"type": "text", "text": text}], {"isSidechain": True})
+
+
+def _cc_tool_result(text):
+    """A tool result — delivered under "user", where hook output is persisted."""
+    return _cc_entry("user", [{"type": "tool_result", "content": text}],
+                     {"isSidechain": True})
+
+
+def _cc_session(tmp_path, session_id="sess1", main_lines=""):
+    """Build a Claude Code project dir: main transcript + its subagents/ dir.
+
+      <project>/<session_id>.jsonl
+      <project>/<session_id>/subagents/agent-<agent_id>.jsonl
+    """
+    project = tmp_path / "project"
+    project.mkdir(exist_ok=True)
+    main = project / f"{session_id}.jsonl"
+    main.write_text(main_lines)
+    sidechains = project / session_id / "subagents"
+    sidechains.mkdir(parents=True, exist_ok=True)
+    return main, sidechains
+
+
+class TestScanSidechainTranscripts:
+    """Sub-agent turns never reach the main transcript — their files count too."""
+
+    def test_marker_found_for_acting_agent(self, tmp_path):
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a1")
+        assert result["impact_check"] is True
+
+    def test_marker_found_without_agent_id(self, tmp_path):
+        """Harnesses that report no agent id still get the session-wide sweep."""
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders")
+        assert result["impact_check"] is True
+
+    def test_unknown_agent_id_falls_back_to_sweep(self, tmp_path):
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "nosuchagent")
+        assert result["impact_check"] is True
+
+    def test_nested_agent_found_by_id(self, tmp_path):
+        """A sub-agent spawned by a sub-agent sits a directory deeper."""
+        main, sidechains = _cc_session(tmp_path)
+        nested = sidechains / "a1"
+        nested.mkdir()
+        (nested / "agent-a2.jsonl").write_text(
+            _cc_assistant_text(
+                "<!-- MC_MONITOR_GAP: orders --> <!-- MC_IMPACT_CHECK_COMPLETE: orders -->"
+            ) + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a2")
+        assert result["impact_check"] is True
+        assert result["monitor_gap"] is True
+
+    def test_marker_in_tool_result_does_not_count(self, tmp_path):
+        """Only the model's own text may unlock the gate — not what was fed to it."""
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_tool_result("[Hook] ... MC_IMPACT_CHECK_COMPLETE: orders ...") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a1")
+        assert result["impact_check"] is False
+
+    def test_no_marker_stays_false(self, tmp_path):
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("Reading the model file now.") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a1")
+        assert result == {"impact_check": False, "monitor_gap": False}
+
+    def test_other_table_marker_does_not_match(self, tmp_path):
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: customers -->") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a1")
+        assert result["impact_check"] is False
+
+    def test_no_sidechain_dir_returns_nothing(self, tmp_path):
+        """Harnesses without sub-agent transcripts are unaffected."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text(_cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(transcript), "orders", "a1")
+        assert result == {"impact_check": False, "monitor_gap": False}
+
+    def test_malformed_line_skipped_valid_line_still_found(self, tmp_path):
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            "this is not json\n"
+            + _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n"
+            + "{also not valid\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a1")
+        assert result["impact_check"] is True
+
+    def test_entries_missing_message_skipped(self, tmp_path):
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            json.dumps({"type": "assistant"}) + "\n"
+            + json.dumps({"type": "assistant", "message": None}) + "\n"
+            + json.dumps(["not", "a", "dict"]) + "\n")
+        result = scan_sidechain_transcripts_for_markers(str(main), "orders", "a1")
+        assert result == {"impact_check": False, "monitor_gap": False}
 
 
 class TestDenyReasonSelfBypass:
@@ -103,6 +243,20 @@ class TestDenyReasonSelfBypass:
         at = tmp_path / "at.history.jsonl"
         at.write_text(_assistant_text(reason) + "\n")
         assert scan_history_jsonl_for_markers(str(at), "macro:helper")["impact_check"] is False
+
+    def test_model_deny_reason_does_not_self_unlock_sidechain(self, tmp_path):
+        """The same invariant for sub-agent transcripts: the deny reason lands there
+        as a tool result, and must not unlock the gate it was emitted by."""
+        reason = self._deny_reason(tmp_path, "models", "orders.sql",
+                                   "SELECT * FROM {{ ref('raw') }}")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(_cc_tool_result(reason) + "\n")
+        assert scan_sidechain_transcripts_for_markers(
+            str(main), "orders", "a1")["impact_check"] is False
+        # And even if the wording were echoed back as assistant text, it must not match.
+        (sidechains / "agent-a1.jsonl").write_text(_cc_assistant_text(reason) + "\n")
+        assert scan_sidechain_transcripts_for_markers(
+            str(main), "orders", "a1")["impact_check"] is False
 
 
 class TestEvaluatePreEdit:
@@ -183,6 +337,140 @@ class TestEvaluatePreEdit:
         assert result.action == "deny"
         assert "macro" in result.reason.lower()
         assert "helper" in result.reason
+
+
+class TestEvaluatePreEditSubAgent:
+    """A sub-agent must be able to satisfy the gate it was blocked by.
+
+    Hook input reports the main session's id and transcript_path even when the
+    edit comes from a sub-agent, whose turns are written to a separate file.
+    """
+
+    def _model(self, tmp_path):
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        sql_file = model_dir / "mixpanel_mcp_events.sql"
+        sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
+        return sql_file
+
+    def test_injected_with_marker_in_sidechain_verifies(self, tmp_path):
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        result = evaluate_pre_edit(inp)
+        assert result.action == "noop"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "verified"
+
+    def test_state_none_with_marker_in_sidechain_verifies(self, tmp_path):
+        sql_file = self._model(tmp_path)
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        result = evaluate_pre_edit(inp)
+        assert result.action == "noop"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "verified"
+
+    def test_monitor_gap_in_sidechain_recorded(self, tmp_path):
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text(
+                "<!-- MC_MONITOR_GAP: mixpanel_mcp_events -->\n"
+                "<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->"
+            ) + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        assert evaluate_pre_edit(inp).action == "noop"
+        assert cache.has_monitor_gap("s1", "mixpanel_mcp_events") is True
+
+    def test_no_assessment_in_sidechain_still_denies(self, tmp_path):
+        """The gate still holds: a sub-agent that skipped the assessment is blocked."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("Editing the model now.") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        result = evaluate_pre_edit(inp)
+        assert result.action == "deny"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "injected"
+
+    def test_marker_for_other_table_in_sidechain_still_denies(self, tmp_path):
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: some_other_model -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        assert evaluate_pre_edit(inp).action == "deny"
+
+    def test_marker_in_main_transcript_still_works(self, tmp_path):
+        """Main-loop edits keep verifying off the main transcript."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, _ = _cc_session(
+            tmp_path,
+            main_lines="<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file), transcript_path=str(main))
+        assert evaluate_pre_edit(inp).action == "noop"
+
+    def test_main_loop_edit_not_unlocked_by_sidechain_marker(self, tmp_path):
+        """A sub-agent's marker satisfies the gate only for that sub-agent.
+
+        The main loop reports no agent_id and its own transcript is the whole
+        surface — an assessment run in a sub-agent's context window is not
+        evidence the editing agent saw the blast radius.
+        """
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file), transcript_path=str(main))
+        assert evaluate_pre_edit(inp).action == "deny"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "injected"
+
+    def test_deeply_nested_json_in_sidechain_still_denies(self, tmp_path):
+        """An unparseable sidechain line leaves the gate denied, never open."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text("[" * 20000 + "]" * 20000 + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        assert evaluate_pre_edit(inp).action == "deny"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "injected"
+
+    def test_nested_json_line_does_not_hide_a_later_marker(self, tmp_path):
+        """One unparseable line skips that line, not the rest of the file."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            "[" * 20000 + "]" * 20000 + "\n"
+            + _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        assert evaluate_pre_edit(inp).action == "noop"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "verified"
 
 
 class TestEvaluatePostEdit:
