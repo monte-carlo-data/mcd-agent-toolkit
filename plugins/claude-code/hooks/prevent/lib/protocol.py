@@ -93,12 +93,15 @@ def _compile_marker_patterns(table_name: str):
 
     Matches the table name with an optional MCON-style prefix (e.g.
     "analytics:prod.client_hub") so markers work even if the model emits a fully
-    qualified name instead of just "client_hub".
+    qualified name instead of just "client_hub". The name must END the marker
+    value: qualification is allowed before it, never after, so a marker for
+    "prod.client_hub.events" does not satisfy the gate for "client_hub".
     """
     esc = re.escape(table_name)
+    end = r"(?=\s|$)"
     return (
-        re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}\b"),
-        re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}\b"),
+        re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}{end}"),
+        re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}{end}"),
     )
 
 
@@ -162,11 +165,14 @@ def _scan_jsonl_assistant_text(path: str, table_name: str, extract_texts) -> dic
     persist hook output, including this gate's own deny reason, back into the
     transcript.
 
-    Malformed (non-JSON) lines are skipped, and undecodable bytes are replaced
-    (errors="replace") so a stray non-UTF-8 byte doesn't abort the whole scan and
-    miss a genuine marker. Worst case the scan finds no marker and the gate stays
-    denied (fail closed) rather than raising into the adapter's safe_run (which
-    would exit 0 and let the edit through).
+    Undecodable bytes are replaced (errors="replace") so a stray non-UTF-8 byte
+    doesn't abort the scan and miss a genuine marker. Every failure is contained
+    at the narrowest scope that can still make progress: a line that won't parse
+    or extract is skipped and the rest of the file is still read; a file that
+    won't open yields no markers. Both exception guards are deliberately broad —
+    the gate must fail CLOSED, and anything escaping into the adapter's safe_run
+    exits 0 and lets the edit through. Deeply nested JSON (RecursionError) and
+    oversized lines (MemoryError) both take this route.
     """
     found = {"impact_check": False, "monitor_gap": False}
     ic_pattern, mg_pattern = _compile_marker_patterns(table_name)
@@ -178,16 +184,17 @@ def _scan_jsonl_assistant_text(path: str, table_name: str, extract_texts) -> dic
                     continue
                 try:
                     entry = json.loads(raw)
-                except (json.JSONDecodeError, ValueError):
+                    if not isinstance(entry, dict):
+                        continue
+                    texts = extract_texts(entry)
+                except Exception:
                     continue
-                if not isinstance(entry, dict):
-                    continue
-                for text in extract_texts(entry):
+                for text in texts:
                     if ic_pattern.search(text):
                         found["impact_check"] = True
                     if mg_pattern.search(text):
                         found["monitor_gap"] = True
-    except (OSError, UnicodeDecodeError):
+    except Exception:
         pass
     return found
 
@@ -210,25 +217,37 @@ def scan_history_jsonl_for_markers(history_path: str, table_name: str) -> dict:
     return _scan_jsonl_assistant_text(history_path, table_name, _cortex_assistant_texts)
 
 
-# Sub-agent (sidechain) turns are written to their own transcript files and never
-# into the main one:
+# Sub-agent (sidechain) turns are written to their own transcript files, keyed by
+# the acting agent's id, under the session's own directory:
 #   <transcript_dir>/<session_id>/subagents/[<parent_agent_id>/]agent-<agent_id>.jsonl
-# Hook input still reports the main session's id and transcript_path, so a marker
-# a sub-agent emitted is invisible to a scan of the main transcript alone.
+# Hook input reports the main session's id and transcript_path in both cases.
 _SIDECHAIN_DIR = "subagents"
 _JSONL_SUFFIX = ".jsonl"
+
+
+def _under_dir(path: str, directory: str) -> bool:
+    """True when `path` resolves to somewhere inside `directory`.
+
+    Symlinks under the transcript directory would otherwise let a scan read
+    another session's markers, so every candidate is checked after resolution.
+    """
+    try:
+        root = os.path.realpath(directory)
+        return os.path.commonpath([root, os.path.realpath(path)]) == root
+    except (OSError, ValueError):
+        return False
 
 
 def _sidechain_transcripts(transcript_path: str, agent_id: str | None) -> list[str]:
     """Sub-agent transcript files belonging to a main transcript.
 
-    Prefers the acting sub-agent's own file when `agent_id` is known; nested
-    sub-agents sit a directory deeper, so the id is matched anywhere below
-    `subagents/`. Falls back to every sidechain of the session when no id was
-    reported or it doesn't resolve — a marker there is still scoped to this
-    session and this table, the same scope the main-transcript scan accepts.
-    Returns nothing for harnesses that don't write sidechains, leaving their
-    behavior unchanged.
+    Prefers the acting sub-agent's own file; nested sub-agents sit a directory
+    deeper, so the id is matched anywhere below `subagents/`. `agent_id` is
+    escaped before it reaches the pattern — it comes from the harness payload,
+    and a raw glob metacharacter there would select files the caller never named.
+    Falls back to every sidechain of the session when the id doesn't resolve.
+    Every candidate must resolve inside the session's own directory.
+    Returns nothing for harnesses that don't write sidechains.
     """
     if not transcript_path.endswith(_JSONL_SUFFIX):
         return []
@@ -236,13 +255,23 @@ def _sidechain_transcripts(transcript_path: str, agent_id: str | None) -> list[s
     sidechain_dir = os.path.join(session_dir, _SIDECHAIN_DIR)
     if not os.path.isdir(sidechain_dir):
         return []
+
+    def contained(paths):
+        return [p for p in paths if os.path.isfile(p) and _under_dir(p, sidechain_dir)]
+
     if agent_id:
-        own = glob.glob(os.path.join(sidechain_dir, "**", f"agent-{agent_id}{_JSONL_SUFFIX}"),
-                        recursive=True)
+        own_name = f"agent-{glob.escape(str(agent_id))}{_JSONL_SUFFIX}"
+        flat = os.path.join(sidechain_dir, own_name)
+        if os.path.isfile(flat) and _under_dir(flat, sidechain_dir):
+            return [flat]
+        own = contained(glob.glob(os.path.join(sidechain_dir, "**", own_name), recursive=True))
         if own:
             return own
-    return sorted(glob.glob(os.path.join(sidechain_dir, "**", f"*{_JSONL_SUFFIX}"),
-                            recursive=True))
+    # Newest first: the acting sub-agent wrote most recently, so the marker is
+    # usually in the first file and the scan stops before reading the rest.
+    sweep = contained(
+        glob.glob(os.path.join(sidechain_dir, "**", f"*{_JSONL_SUFFIX}"), recursive=True))
+    return sorted(sweep, key=lambda p: (-os.path.getmtime(p), p))
 
 
 def _claude_code_assistant_texts(entry: dict) -> list[str]:
@@ -281,9 +310,11 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
     Adapters that store messages in an Anthropic Messages-style `.history.jsonl`
     (Cortex) set inp.transcript_format == "messages_jsonl" and point
     transcript_path at that sibling file. "raw" (the default) uses the raw-line
-    scan, plus the session's sub-agent transcripts — a sub-agent's turns never
-    reach the main transcript, so without them an assessment run inside a
-    sub-agent can never satisfy the gate. An unrecognized format (e.g. a future
+    scan over the main transcript. A sub-agent's turns are written to their own
+    file, so when the caller is a sub-agent (inp.agent_id is set) its sidechains
+    are scanned too. A main-loop edit reports no agent_id and its own transcript
+    is the whole surface: the evidence must sit in the context window of the
+    agent doing the editing. An unrecognized format (e.g. a future
     adapter's typo) deliberately returns no markers so the gate stays denied —
     failing CLOSED rather than silently scanning with the wrong reader (which
     would drop the assistant-text protection) or raising (which fails OPEN, since
@@ -296,8 +327,11 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
     if inp.transcript_format == "messages_jsonl":
         return scan_history_jsonl_for_markers(path, table_name)
     if inp.transcript_format == "raw":
+        main = scan_transcript_for_markers(path, table_name)
+        if not inp.agent_id:
+            return main
         return _merge_markers(
-            scan_transcript_for_markers(path, table_name),
+            main,
             scan_sidechain_transcripts_for_markers(path, table_name, inp.agent_id),
         )
     return no_markers  # unknown format → fail closed

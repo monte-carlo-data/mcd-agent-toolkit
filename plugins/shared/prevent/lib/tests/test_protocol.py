@@ -48,6 +48,27 @@ class TestScanTranscriptForMarkers:
         result = scan_transcript_for_markers(str(transcript), "client_hub_master")
         assert result["impact_check"] is False
 
+    def test_qualified_prefix_still_matches(self, tmp_path):
+        """A fully qualified name resolves to its final segment."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: analytics:prod.orders -->\n')
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is True
+
+    def test_other_table_qualified_by_target_no_match(self, tmp_path):
+        """orders must end the marker value, not merely appear inside it."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: prod.orders.customers -->\n')
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is False
+
+    def test_hyphenated_sibling_no_match(self, tmp_path):
+        """orders-staging is a different table from orders."""
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: orders-staging -->\n')
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is False
+
 
 def _cc_entry(entry_type, content, extra=None):
     """One Claude Code transcript line: author in "type", message nested."""
@@ -322,10 +343,7 @@ class TestEvaluatePreEditSubAgent:
     """A sub-agent must be able to satisfy the gate it was blocked by.
 
     Hook input reports the main session's id and transcript_path even when the
-    edit comes from a sub-agent, whose turns are written to a separate file. With
-    only the main transcript scanned, "injected" could never reach "verified":
-    the edit was denied inside the grace period and the full instruction
-    re-injected after it, with no way out.
+    edit comes from a sub-agent, whose turns are written to a separate file.
     """
 
     def _model(self, tmp_path):
@@ -410,6 +428,49 @@ class TestEvaluatePreEditSubAgent:
 
         inp = HookInput(session_id="s1", file_path=str(sql_file), transcript_path=str(main))
         assert evaluate_pre_edit(inp).action == "noop"
+
+    def test_main_loop_edit_not_unlocked_by_sidechain_marker(self, tmp_path):
+        """A sub-agent's marker satisfies the gate only for that sub-agent.
+
+        The main loop reports no agent_id and its own transcript is the whole
+        surface — an assessment run in a sub-agent's context window is not
+        evidence the editing agent saw the blast radius.
+        """
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file), transcript_path=str(main))
+        assert evaluate_pre_edit(inp).action == "deny"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "injected"
+
+    def test_deeply_nested_json_in_sidechain_still_denies(self, tmp_path):
+        """An unparseable sidechain line leaves the gate denied, never open."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text("[" * 20000 + "]" * 20000 + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        assert evaluate_pre_edit(inp).action == "deny"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "injected"
+
+    def test_nested_json_line_does_not_hide_a_later_marker(self, tmp_path):
+        """One unparseable line skips that line, not the rest of the file."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "mixpanel_mcp_events")
+        main, sidechains = _cc_session(tmp_path)
+        (sidechains / "agent-a1.jsonl").write_text(
+            "[" * 20000 + "]" * 20000 + "\n"
+            + _cc_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: mixpanel_mcp_events -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(main), agent_id="a1")
+        assert evaluate_pre_edit(inp).action == "noop"
+        assert cache.get_impact_check_state("s1", "mixpanel_mcp_events") == "verified"
 
 
 class TestEvaluatePostEdit:
