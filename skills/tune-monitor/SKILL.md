@@ -142,6 +142,12 @@ reference loaded in Phase 1.5. At minimum, extract:
 - Schedule interval
 - Audiences / notification channels
 - Whether the monitor uses ML thresholds or explicit thresholds
+- The value of every setting you might propose changing — sensitivity, thresholds, the time bucket
+  it aggregates on, its filter, and the segments it already excludes
+
+That last item is what Phase 3 checks each recommendation against, so extract it even where nothing
+about the report suggests the setting is the problem. Write the values down in your analysis; a
+setting you never read is one you cannot tell you are about to re-propose.
 
 ### 2d. Troubleshooting analysis (if available)
 Look at any troubleshooting TL;DRs in the report. Note:
@@ -157,6 +163,20 @@ Based on the analysis, produce a prioritized list of recommendations. For each r
 - State the **problem** it solves
 - Give the **specific config change** (use exact field names from the MC config schema)
 - Explain the **trade-off** (what signal might be lost)
+
+**Check every change against the value you read in 2c.** Reading the configuration is the floor,
+not the point — a lever the monitor is already set to is not a recommendation, it is a report that
+the user's change did not take, and it costs them a second attempt at something already done.
+Before naming a lever, find it in what you extracted and confirm the monitor is not already there.
+If it is, say so under **What NOT to change** and spend the slot on a lever that would actually
+move. This binds the heading as tightly as the body: a recommendation titled *"switch to weekly
+buckets"* on a monitor already bucketing weekly reads as advice to re-apply it, whatever the
+paragraph underneath goes on to say.
+
+The same applies to a change someone made recently. The report covers a window; the configuration
+is only as of now. If `last_update_time` is more recent than the alerts you are reasoning from,
+those alerts fired under an older configuration — say so, and check each lever against the current
+values rather than against what the alert pattern implies the monitor used to be set to.
 
 ### General recommendations (all monitor types)
 

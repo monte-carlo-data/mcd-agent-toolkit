@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.1] - 2026-08-10
+
+### Changed
+
+- tune-monitor: check every recommended lever against the configuration read in
+  Phase 2c before naming it — a setting the monitor is already on is a report
+  that the user's change did not take, not a recommendation (AI-872)
+
 ## [1.24.0] - 2026-08-02
 
 ### Added
