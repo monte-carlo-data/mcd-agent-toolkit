@@ -4,8 +4,8 @@ description: |
   Investigate data incidents and find root causes using Monte Carlo's
   observability data. Guides the agent through systematic investigation:
   alert lookup, lineage tracing, ETL checks, query analysis, and data
-  profiling. Activates when a user asks about data issues, incidents,
-  alerts, or why data looks wrong.
+  profiling and alert-scoped runtime logs. Activates when a user asks about
+  data issues, incidents, alerts, or why data looks wrong.
 bucket: Incident Response
 version: 1.0.0
 ---
@@ -37,7 +37,7 @@ Activate when the user:
 - Asks "why is this table stale?" or "why did row count drop?"
 - Wants to investigate a data quality issue
 - Asks about freshness, volume, or schema problems
-- Mentions pipeline failures (Airflow, dbt, Databricks)
+- Mentions pipeline failures (Azure Data Factory, Airflow, dbt, Databricks)
 - Says things like "debug this alert", "investigate this incident", "root cause analysis"
 
 ## When NOT to activate this skill
@@ -65,6 +65,7 @@ Do not activate when the user is:
 | Tool | Purpose |
 |------|---------|
 | `get_alerts` | Fetch incident/alert details |
+| `fetch_logs` | Fetch normalized runtime logs for an alert-scoped resource and exact incident window |
 | `search` | Find tables by name or keyword |
 | `get_table` | Table metadata and fields |
 | `get_asset_lineage` | Table-level upstream/downstream lineage |
@@ -79,7 +80,7 @@ Do not activate when the user is:
 | `get_github_prs` | Recent GitHub PRs from the account's MC GitHub integration |
 | `get_jobs_performance` | Job runtime stats, failure rates, 7-day trends |
 | `get_change_timeline` | Unified timeline: query changes + volume + ETL failures |
-| `alert_assessment` | Optional ~2-min triage of an incident — returns HIGH/MEDIUM/LOW confidence and impact. Useful when you want a quick read before deciding to escalate to TSA. |
+| `alert_assessment` | Optional ~2-min incident context/triage call. Use `include_context=True` only as the fallback for exact missing log-window bounds; do not use its generated diagnosis as manual RCA evidence. |
 | `run_troubleshooting_agent` | Starts the Troubleshooting Agent (TSA) on an incident. Async by default; idempotent (returns existing results unless `force_rerun=True`). Auto-invoked at Step 1.5 when an incident UUID is present. |
 | `get_troubleshooting_agent_results` | Polls TSA results for an incident (`status` is `not_found` / `running` / `success` / `failed`). Use to check on the async run started at Step 1.5. |
 
@@ -100,8 +101,20 @@ Do not activate when the user is:
 
 **If the user provides an alert or incident ID:**
 1. Call `get_alerts` with the alert ID to fetch details.
-2. Identify: affected table(s), issue type (freshness, volume, schema, field metric), when it started.
-3. Proceed to Step 2.
+2. Identify: affected asset(s), issue type (freshness, volume, schema, field metric, ETL failure), and when it started.
+3. For an ETL job-failure alert, retain the job asset MCON or returned resource ID and the exact
+   start-inclusive, end-exclusive incident window. These values belong to the alert; never ask the
+   model to invent them.
+   - Prefer explicit resource and window fields returned by `get_alerts`.
+   - A job MCON has the shape `MCON++<account>++<resource>++job++<job name>`; when no explicit
+     resource field exists, derive the resource from that returned MCON. Never display the MCON or
+     resource UUID to the user.
+   - If `get_alerts` omits either time bound, call `alert_assessment(incident_id=<alert id>,
+     include_context=True)` and use only the exact `Incident Overview` time range from its returned
+     context to scope logs. Do not treat the assessment's generated diagnosis as manual RCA evidence.
+     If the user also opted out of `alert_assessment`, or no exact bounds are returned, report the
+     missing scope and do not call `fetch_logs` with guessed timestamps.
+4. Proceed to Step 2.
 
 **If the user describes a problem WITHOUT an incident ID:**
 Read `references/intake-no-incident.md` for the full intake flow. In short:
@@ -136,15 +149,45 @@ run_troubleshooting_agent(incident_id="<uuid>", async_mode=True)
 
 Tell the user what you started: "I've kicked off the Troubleshooting Agent on this incident — it usually finishes in 4–8 minutes. While it runs, I'll continue investigating manually so we have findings either way."
 
+### Step 1.75: Fetch alert-scoped runtime logs (ETL failures)
+
+When the resolved alert is an ETL job failure and Step 1 produced both an exact resource and exact
+incident window, use `fetch_logs` directly before the table-centric investigation:
+
+1. Call `fetch_logs(resource_id=<derived resource>, start_time=<inclusive start>,
+   end_time=<exclusive end>)` **without** `search_regex` or `severity` filters first.
+2. Record the normalized record count and returned timestamp range. Inspect each record's timestamp,
+   message, and severity when present.
+3. If the first page is noisy, make one or more narrower `fetch_logs` calls with a useful
+   `search_regex` or severity list. This is the intentional exception to the workflow's usual
+   no-repeat rule: the unfiltered call establishes the evidence population; narrowed calls isolate
+   relevant records.
+4. Separate direct causal evidence from exclusionary evidence:
+   - An explicit runtime error or stack trace can establish the failure cause.
+   - Correlated webhook receipt/processing can establish that Monte Carlo ingested the upstream
+     orchestrator event successfully and rule out an ingestion failure. This materially narrows the
+     RCA even if the normalized message does not repeat the failing activity name.
+   - A successful processing record does not, by itself, prove why the upstream job failed; combine
+     it with the alert's exact failure message, job metadata, and history.
+
+If `fetch_logs` is unavailable or fails, report that gap and continue with the remaining read-only
+signals. Never substitute a guessed resource or time window.
+
 ### Step 2: Map the blast radius
 
 > **TSA in parallel:** if you started TSA at Step 1.5, it is running in the background while you do this step. Do not block on it.
+
+If the alert contains table assets:
 
 1. Call `get_asset_lineage(mcons=[table_mcon], direction="UPSTREAM")` — what feeds this table?
 2. Call `get_asset_lineage(mcons=[table_mcon], direction="DOWNSTREAM")` — what does this table feed?
 3. If the issue involves specific fields, call `get_field_lineage` to trace which upstream fields feed the affected columns.
 
-Report to the user: "This table is fed by X upstream sources and feeds Y downstream consumers. Here's what could be impacted."
+If the alert is job-only and identifies no tables, do not pass its job MCON to table tools. State
+that table-level blast radius is unavailable from the incident and continue to the ETL playbook.
+
+For table-backed alerts, report to the user: "This table is fed by X upstream sources and feeds Y
+downstream consumers. Here's what could be impacted."
 
 **Ask for direction:** Before diving deeper, ask the user what they'd like to investigate first. They may already have a hunch ("I think it's the Airflow job" or "check if someone changed the SQL"). Follow their lead — don't run all investigation paths blindly. If they have no preference, proceed with the most likely path based on the issue type.
 
@@ -157,7 +200,7 @@ Read the appropriate reference file and follow its investigation playbook:
 | Table not updating on schedule | `references/freshness-investigation.md` |
 | Unexpected row count changes | `references/volume-investigation.md` |
 | Columns added, removed, or type-changed | `references/schema-investigation.md` |
-| Airflow/dbt/Databricks pipeline failures | `references/etl-failure-investigation.md` |
+| Azure Data Factory/Airflow/dbt/Databricks pipeline failures | `references/etl-failure-investigation.md` |
 | SQL modifications causing data changes | `references/query-change-investigation.md` |
 | Field-level metric drift (null rate, mean, etc.) | `references/field-anomaly-investigation.md` |
 | Agent-monitor alert (agent evaluation, metric, trajectory, or validation) | Hand off — read and follow `../troubleshoot-agent-traces/SKILL.md` instead of continuing here |
@@ -187,11 +230,13 @@ If the user has a database MCP server connected (Snowflake, BigQuery, Redshift, 
 
 ### Step 6: Check for code changes
 
-Call `get_github_prs` with a time range around when the issue started to find recent PRs from the account's Monte Carlo GitHub integration. Look for PRs that modified dbt models, SQL files, or pipeline configs affecting the impacted table.
+Call `get_github_prs` with a time range around when the issue started to find recent PRs from the account's Monte Carlo GitHub integration. Look for PRs that modified dbt models, SQL files, or pipeline configs affecting the impacted asset.
 
 If the account has no GitHub integration (tool returns empty), or the user has a local GitHub MCP server they prefer, use that instead.
 
-Also call `get_query_changes` with the affected table MCONs to detect SQL text modifications, and `get_change_timeline` for a unified view of all changes (query modifications + volume shifts + ETL failures) in one call.
+When table assets exist, also call `get_query_changes` with their MCONs to detect SQL text
+modifications, and `get_change_timeline` for a unified view of all changes (query modifications +
+volume shifts + ETL failures). Skip these table-only calls for a job-only incident.
 
 ### Step 7: Synthesize and present
 
@@ -200,7 +245,8 @@ Also call `get_query_changes` with the affected table MCONs to detect SQL text m
 Read `references/common-root-causes.md` to match findings against known patterns. Present:
 
 1. **Root cause** — what happened and when, with evidence from tools
-2. **Evidence chain** — which tools confirmed each piece of the story
+2. **Evidence chain** — which tools confirmed each piece of the story, including how runtime logs
+   directly established or materially narrowed the cause
 3. **Impact** — what downstream tables/consumers are affected (from Step 2)
 4. **Recommended fix** — specific action to resolve the issue
 5. **Prevention** — suggest monitoring to catch this earlier next time
@@ -221,6 +267,10 @@ Read `references/common-root-causes.md` to match findings against known patterns
 - **Check the timeline.** The most common pattern is: "X changed at time T, and the anomaly started at time T+1." Use `get_change_timeline` for this.
 - **Be specific about what you can't check.** If no DB connector is available, explain what additional investigation would be possible with one.
 - **Never expose MCONs, UUIDs, or internal identifiers** to the user. Use human-readable table names.
-- **Cross-platform awareness.** ETL issues can come from Airflow, dbt, or Databricks. Check all platforms that are relevant.
+- **Cross-platform awareness.** ETL issues can come from Azure Data Factory, Airflow, dbt, or Databricks. Check all platforms that are relevant.
 - **Do not invoke TSA without an incident UUID.** `run_troubleshooting_agent` requires one. If intake is on the no-incident path, skip TSA entirely until/unless an alert is identified.
-- **Honor explicit user opt-outs.** If the user says "skip TSA", "manual only", or similar, do not call `run_troubleshooting_agent` or `alert_assessment` — proceed with the manual investigation only.
+- **Honor explicit user opt-outs precisely.** If the user says "skip TSA", do not call
+  `run_troubleshooting_agent`. Do not use `alert_assessment` as a substitute RCA. It may be called
+  with `include_context=True` solely to recover an exact missing incident window for `fetch_logs`,
+  unless the user also opts out of alert assessment or all agentic calls. In that case, proceed with
+  the remaining manual investigation and do not guess the log window.

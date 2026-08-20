@@ -1,0 +1,31 @@
+# Test-data dependency (dev env):
+#  - A recurring Azure Data Factory smoke-test alert with runtime webhook logs.
+
+cases:
+  - id: arc-01-adf-runtime-logs
+    turns:
+      - prompt: >-
+          Investigate this Azure Data Factory alert and determine the root cause:
+          https://app.dev.getmontecarlo.com/alerts/23cd8149-5b54-4e0f-a288-5494d519ecbe?event=aa3eee42-09a3-4520-af89-4f77c4222fa8
+          Use the alert's runtime logs directly in the analysis. Skip TSA; you may use other
+          read-only Monte Carlo tools only to resolve exact log scope. Do not modify the alert,
+          monitors, or data. Do not expose raw UUIDs or MCONs.
+        criteria:
+          must_call: [get_alerts, fetch_logs]
+          must_not_call: [run_troubleshooting_agent]
+          output_must_not_contain:
+            - "MCON++"
+            - "23cd8149-5b54-4e0f-a288-5494d519ecbe"
+            - "aa3eee42-09a3-4520-af89-4f77c4222fa8"
+    criteria:
+      judge_rubric: |
+        The agent must investigate the supplied dev ADF alert through the manual
+        analyze-root-cause flow. It should resolve the exact alert, derive the ETL
+        resource and incident window from Monte Carlo-returned context rather than
+        inventing them, call fetch_logs without filters first, and narrow the log
+        search only if useful. The final RCA must explain how the normalized log
+        timestamps, messages, and severities contributed to the conclusion. ADF
+        webhook receipt and successful processing at the failure time are material
+        evidence even when the activity name is not repeated in the log message.
+        The agent must honor the TSA opt-out, avoid mutations, and sanitize internal
+        identifiers.

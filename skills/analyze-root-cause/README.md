@@ -4,7 +4,8 @@ Investigate data incidents and find root causes using Monte Carlo's observabilit
 
 ## What it does
 
-- Investigates freshness delays, volume anomalies, schema changes, ETL failures, query regressions, and field metric drift
+- Investigates freshness delays, volume anomalies, schema changes, ETL failures (including Azure Data Factory), query regressions, and field metric drift
+- Fetches alert-scoped normalized runtime logs before narrowing noisy results, then uses them as RCA evidence
 - Maps blast radius using table and field-level lineage
 - Traces bad data upstream to find the source
 - Correlates changes (query modifications, volume shifts, ETL failures) with incident timeline
@@ -18,6 +19,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | Tool | Purpose |
 |------|---------|
 | `get_alerts` | Fetch incident/alert details |
+| `fetch_logs` | Fetch normalized runtime logs for the alert resource and exact incident window |
 | `search` | Find tables by name |
 | `get_table` | Table metadata and fields |
 | `get_asset_lineage` | Table-level lineage |
@@ -32,7 +34,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_etl_jobs` | Find ETL jobs writing to tables (Airflow, dbt, Databricks) — pass `platform` param |
 | `get_github_prs` | Recent GitHub PRs (via MC's GitHub integration) |
 | `get_jobs_performance` | Job runtime stats, failure rates, trends |
-| `alert_assessment` | Optional ~2-min triage of an incident (HIGH/MEDIUM/LOW confidence + impact) |
+| `alert_assessment` | Optional incident context/triage call; fallback source for exact missing log-window bounds |
 | `run_troubleshooting_agent` | Starts the Troubleshooting Agent (TSA) on an incident; auto-invoked when an incident UUID is present |
 | `get_troubleshooting_agent_results` | Polls TSA results for an incident |
 
@@ -54,6 +56,8 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 Intake (alert ID or user description)
     ↓
 Auto-invoke TSA (if incident UUID + not opt-out + not narrow check)  ─┐
+    ↓                                                                  │
+Fetch runtime logs (alert-scoped ETL failures)                         │
     ↓                                                                  │
 Map blast radius (upstream + downstream lineage)                       │ TSA runs
     ↓                                                                  │ async in

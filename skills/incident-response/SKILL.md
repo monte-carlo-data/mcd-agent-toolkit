@@ -98,7 +98,7 @@ Then proceed to Step 2 with the identified alert context.
 
 **This is the core step.** Most workflow entries start here.
 
-**Investigate linearly — do not re-call tools.** Walk through the investigation once: (1) find the table, (2) fetch its alerts and freshness, (3) check lineage, (4) check recent queries/ETL. Call each tool at most once per table. If a tool result is insufficient, move to the next signal rather than re-calling with different params — burning turns on redundant calls exhausts the budget before the root cause is reached.
+**Investigate linearly — do not re-call tools.** Walk through the investigation once: (1) find the asset, (2) fetch its alerts and health context, (3) check lineage when tables exist, (4) check recent queries/ETL. Call each tool at most once per asset. If a tool result is insufficient, move to the next signal rather than re-calling with different params — burning turns on redundant calls exhausts the budget before the root cause is reached. The one intentional exception is `fetch_logs`: follow the analyze-root-cause skill's unfiltered-first call with a narrower regex or severity call when the first page is noisy.
 
 **Transition to Step 3:** When the root cause is identified (or the investigation reaches its limit), summarize findings and tell the user:
 
