@@ -25,6 +25,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 | **Analyze Root Cause** | Investigates incidents via lineage tracing, ETL checks, query analysis, and data profiling. | [README](skills/analyze-root-cause/README.md) |
 | **Remediation** | Proposes and executes fixes for data-quality alerts; assesses blast radius before acting, or escalates with full context. | [README](skills/remediation/README.md) |
 | **Troubleshoot Agent Traces** | Investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces — kicks off the trace troubleshooting agent and guides a backend-aware manual investigation. | [README](skills/troubleshoot-agent-traces/README.md) |
+| **Runtime Logs** _(POC — not for merge)_ | Pulls the runtime logs behind a failed pipeline run (CloudWatch, MWAA, Databricks, Datadog) using this workspace's own credentials. Monte Carlo supplies the failed run's identity; retrieval stays local. | [SKILL](skills/runtime-logs/SKILL.md) |
 
 ### Monitoring — coverage gaps, monitor creation, noise reduction
 

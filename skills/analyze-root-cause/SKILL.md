@@ -173,6 +173,12 @@ Data issues often originate upstream. Walk the lineage chain:
 2. Use `get_field_lineage` to trace the specific field that has bad data back to its source.
 3. Check what upstream field values correlate with the anomaly (if DB connector is available — see Step 5).
 
+**Failed run with no explanatory error?** If `get_etl_issues` shows a failure whose `error` doesn't
+explain anything — or shows no run at all when one was scheduled — the cause is in the runtime log,
+not the data layer. Hand off to the `monte-carlo-runtime-logs` skill (read
+`../runtime-logs/SKILL.md`), which pulls the logs for that run using this workspace's own cloud
+credentials. Common for ECS/MWAA/Databricks failures that die before the job emits anything.
+
 **TSA poll #1.** If you started TSA at Step 1.5 and it has not yet returned `success`, call `get_troubleshooting_agent_results(incident_id=...)` once here (~30s after Step 1.5). If status is `success`, hold the result for Step 7. If still `running`, keep going — you'll poll again before Step 7. Don't block on it.
 
 ### Step 5: Profile data (if database MCP is available)
